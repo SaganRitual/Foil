@@ -69,6 +69,11 @@ class FoilSimulation {
 
     let config: FoilSimulationConfig
 
+    let simulationDispatchQueue = DispatchQueue(
+        label: "simulator.q", qos: .default, attributes: [/*serial*/],
+        target: DispatchQueue.global(qos: .default)
+    )
+
     // When set to true, stop an asynchronously executed simulation
     var halt = false
 
@@ -112,7 +117,7 @@ class FoilSimulation {
     func runAsyncWithUpdateHandler(
         updateHandler: @escaping FoilDataUpdateHandler, dataProvider: @escaping FoilFullDatasetProvider
     ) {
-        DispatchQueue.global(qos: .default).async {
+        simulationDispatchQueue.async {
             self.commandQueue = self.device.makeCommandQueue()
 
             self.runAsyncLoopWithUpdateHandler(updateHandler: updateHandler)

@@ -36,7 +36,8 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
     static let FoilNumSimulationConfigs = FoilSimulationConfigTable.count
 
-    var _view: MTKView { guard let v = self.view as? MTKView else { fatalError() }; return v }
+//    var _view: MTKView { guard let v = self.view as? MTKView else { fatalError() }; return v }
+    var _view: MTKView { (self.view as? MTKView)! }
     var renderer: FoilRenderer!
     var simulation: FoilSimulation!
 

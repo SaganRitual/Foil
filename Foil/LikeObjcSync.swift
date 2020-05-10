@@ -1,6 +1,6 @@
 import Foundation
 
-class LikeObjcSync {
+class ikeObjcSync {
     public class func synced(_ lock: Any, closure: () -> ()) {
         objc_sync_enter(lock)
         defer { objc_sync_exit(lock) }

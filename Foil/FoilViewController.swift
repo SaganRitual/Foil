@@ -14,17 +14,24 @@ class FoilViewController: NSViewController, MTKViewDelegate {
         assert(false)
     }
 
+    let IntelGPUInMetalDevicesArray = 0
+    let RadeonGPUInMetalDevicesArray = 1
+
+    static let frameTime: Double = 1.0 / 60.0
+    static let second: Double = frameTime * 60.0
+    static let metersPerSecond: Double = 600.0
+
     // Table with various simulation configurations.  Apps would typically load simulation parameters
     // such as these from a file or UI controls, but to simplify the sample and focus on Metal usage,
     // this table is hardcoded
     static let FoilSimulationConfigTable = [
         // damping softening numBodies clusterScale velocityScale renderScale renderBodies simInterval simDuration
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 16384, clusterScale: 1.54, velocityScale:   8, renderScale:   25.0, renderBodies: 16384, simInterval: 0.0160, simDuration: 500.0),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.100, numBodies: 16384, clusterScale: 0.32, velocityScale: 276, renderScale:    2.5, renderBodies: 16384, simInterval: 0.0006, simDuration: 5.0),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 16384, clusterScale: 0.68, velocityScale:  20, renderScale: 1700.0, renderBodies: 16384, simInterval: 0.0160, simDuration: 5.0),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 16384, clusterScale: 1.54, velocityScale:   8, renderScale:   25.0, renderBodies: 16384, simInterval: 0.0160, simDuration: 5.0),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 16384, clusterScale: 6.04, velocityScale:   0, renderScale:  300.0, renderBodies: 16384, simInterval: 0.0160, simDuration: 5.0),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.145, numBodies: 16384, clusterScale: 0.32, velocityScale: 272, renderScale:    2.5, renderBodies: 16384, simInterval: 0.0006, simDuration: 5.0)
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 4096, clusterScale: 0.32, velocityScale: metersPerSecond / 30, renderScale:    2.5, renderBodies: 4096, simInterval: frameTime / 30, simDuration: 10.0 * second / 30),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 4096, clusterScale: 6.04, velocityScale:                    0, renderScale:   75.0, renderBodies: 4096, simInterval: frameTime,      simDuration: 10.0 * second),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.145, numBodies: 4096, clusterScale: 0.32, velocityScale: metersPerSecond / 30, renderScale:    2.5, renderBodies: 4096, simInterval: frameTime / 30, simDuration: 10.0 * second / 30),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 4096, clusterScale: 1.54, velocityScale: metersPerSecond / 30, renderScale:   75.0, renderBodies: 4096, simInterval: frameTime,      simDuration: 10.0 * second),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.100, numBodies: 4096, clusterScale: 0.68, velocityScale: metersPerSecond / 30, renderScale: 1000.0, renderBodies: 4096, simInterval: frameTime,      simDuration: 10.0 * second),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 4096, clusterScale: 1.54, velocityScale: metersPerSecond / 30, renderScale:   75.0, renderBodies: 4096, simInterval: frameTime,      simDuration: 10.0 * second)
     ]
 
     static let FoilNumSimulationConfigs = FoilSimulationConfigTable.count
@@ -33,23 +40,48 @@ class FoilViewController: NSViewController, MTKViewDelegate {
     var renderer: FoilRenderer!
     var simulation: FoilSimulation!
 
+    // The current time (in simulation time units) that the simulation has processed
     var simulationTime: CFAbsoluteTime = 0
+
+    // When rendering is paused (such as immediately after a simulation has completed), the time
+    // to unpause and continue simulations.
     var continuationTime: CFAbsoluteTime = 0
 
     var computeDevice: MTLDevice!
 
+    // Index of the current simulation config in the simulation config table
     var configNum = 0
+
+    // Currently running simulation config
     var config: FoilSimulationConfig!
 
+    // Command queue used when simulation and renderer are using the same device.
+    // Set to nil when using different devices
     var commandQueue: MTLCommandQueue!
 
+    // When true, stop running any more simulations (such as when the window closes).
     var terminateAllSimulations = false
+
+    // When true, restart the current simulation if it was interrupted and data could not
+    // be retrieved
     var restartSimulation = false
 
+    // UI showing current simulation name and percentage complete
     @IBOutlet var _simulationName: NSTextField!
     @IBOutlet var _simulationPercentage: NSTextField!
 
+    // Timer used to make the text fields blink when results have been completed
     var blinker: Timer!
+
+    let viewControllerispatchQueue = DispatchQueue(
+        label: "viewController.q", qos: .default, attributes: [/*serial*/],
+        target: DispatchQueue.global(qos: .default)
+    )
+
+    let dataUpdateDispatchQueue = DispatchQueue(
+        label: "dataUpdate.q", qos: .default, attributes: [/*serial*/],
+        target: DispatchQueue.global(qos: .default)
+    )
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -58,16 +90,10 @@ class FoilViewController: NSViewController, MTKViewDelegate {
         _view.delegate = self
     }
 
-    override var representedObject: Any? {
-        didSet { assert(false) }
-    }
-
-    static let FoilSecondsToPresentSimulationResults = CFTimeInterval(4.0)
-
     override func viewDidAppear() { beginSimulation() }
 
     override func viewDidDisappear() {
-        LikeObjcSync.synced(self) {
+        viewControllerispatchQueue.sync {
             // Stop simulation if on another thread
             self.simulation.halt = true;
 
@@ -81,39 +107,16 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
         precondition(!availableDevices.isEmpty, "Metal is not supported on this Mac")
 
-        // Select compute device
-        for device in availableDevices {
-            if device.isRemovable {
-                // Select removable device if available since if there is one, it's probably the most
-                // powerful device available
-                computeDevice = device;
-                break;
-            } else if device.isHeadless {
-                // Select headless device since if there is one it's probably dedicated to compute
-                // tasks
-                computeDevice = device;
-            }
-        }
-
-        if computeDevice == nil {
-            guard let cd = MTLCreateSystemDefaultDevice() else { fatalError() }
-            computeDevice = cd
-        }
-
+        computeDevice = availableDevices[RadeonGPUInMetalDevicesArray]
         NSLog("Selected compute device: \(computeDevice.name)")
 
-        // Select renderer device (stored as _view.device)
-
-        // Query for device driving the display
-        let key = NSDeviceDescriptionKey("NSScreenNumber")
-        let viewDisplayID = (_view.window?.screen?.deviceDescription[key] as? CGDirectDisplayID) ?? CGDirectDisplayID()
-
-        let rendererDevice = CGDirectDisplayCopyCurrentMetalDevice(viewDisplayID);
+        // Select renderer device
+        let rendererDevice = availableDevices[RadeonGPUInMetalDevicesArray]
 
         if rendererDevice !== _view.device {
             _view.device = rendererDevice;
 
-            NSLog("New render device: '\(_view.device!.name)'")
+            NSLog("New render device: '\(rendererDevice.name)'")
 
             renderer = FoilRenderer(_view)
             renderer.drawableSizeWillChange(size: _view.drawableSize)
@@ -151,12 +154,10 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
         let updateHandler: (NSData, CFAbsoluteTime) -> () = {
             // Update the renderer's position data so that it can show forward progress
-//            print("update handler st = \($1)")
             self.updateWithNewPositionData(updateData: $0, forSimulationTime: $1)
         }
 
         let dataProvider: (NSData, NSData, CFAbsoluteTime) -> () = {
-            print("dataProvider st = \($2)")
             self.handleFullyProvidedSetOfPositionData(positionData: $0, velocityData: $1, forSimulationTime: $2)
         }
 
@@ -166,12 +167,12 @@ class FoilViewController: NSViewController, MTKViewDelegate {
     /// Receive and update of new positions for the simulation time given.
     func updateWithNewPositionData(updateData: NSData, forSimulationTime simulationTime: CFAbsoluteTime) {
         // Lock with updateData so thus thread does not update data during an update on another thread
-        LikeObjcSync.synced(updateData) {
+        dataUpdateDispatchQueue.sync {
             // Update the renderer's position data so that it can show forward progress
             self.renderer.providePositionData(data: updateData)
         }
 
-        LikeObjcSync.synced(self) {
+        viewControllerispatchQueue.sync {
             // Lock around _simulation time since it will be accessed on another thread
             self.simulationTime = simulationTime;
         }
@@ -183,13 +184,11 @@ class FoilViewController: NSViewController, MTKViewDelegate {
         positionData: NSData, velocityData: NSData,
         forSimulationTime simulationTime: CFAbsoluteTime
     ) {
-        LikeObjcSync.synced(self) {
+        viewControllerispatchQueue.sync {
             if self.terminateAllSimulations {
                 NSLog("Terminating all simulations")
                 return
             }
-
-            print("here self.simulationTime = simulationTime: \(self.simulationTime) = \(simulationTime), \(config.simDuration)")
 
             self.simulationTime = simulationTime;
 
@@ -230,6 +229,8 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
     /// Called whenever view changes orientation or layout is changed
     func drawableSizeWillChange(size: CGSize) { renderer.drawableSizeWillChange(size: size) }
+
+    static let FoilSecondsToPresentSimulationResults = CFTimeInterval(4.0)
 
     /// Called whenever the view needs to render
     func draw(in view: MTKView) {
@@ -303,18 +304,15 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
             commandBuffer.popDebugGroup()
 
-            let st = simulationTime
             simulationTime += Double(config.simInterval)
-            print("draw st before \(st) after \(simulationTime)")
         } else {
-            print("no draw ish \(simulationTime)")
             renderer.drawProvidedPositionDataWithNumBodies(numParticles: numBodies, inView: _view)
         }
 
         var percentComplete = 0
 
         // Lock when using _simulationTime since it can be updated on a separate thread
-        LikeObjcSync.synced(self) {
+        viewControllerispatchQueue.sync {
             percentComplete = Int((simulationTime / config.simDuration) * 100)
         }
 

@@ -5,6 +5,23 @@ let FoilNumUpdateBuffersStored = 3;
 
 // Parameters to perform the N-Body simulation
 struct FoilSimulationConfig {
+
+    init(
+        damping: Double, softeningSqr: Double, numBodies: Int, clusterScale: Double,
+        velocityScale: Double, renderScale: Double, renderBodies: Int, simInterval: Double,
+        simDuration: CFAbsoluteTime
+    ) {
+        self.damping = Float(damping)
+        self.softeningSqr = Float(softeningSqr)
+        self.numBodies = numBodies
+        self.clusterScale = Float(clusterScale)
+        self.velocityScale = Float(velocityScale)
+        self.renderScale = Float(renderScale)
+        self.renderBodies = renderBodies
+        self.simInterval = Float(simInterval)
+        self.simDuration = simDuration
+    }
+
     let damping: Float;             // Factor for reducing simulation instability
     let softeningSqr: Float;        // Factor for simulating collisions
     let numBodies: Int              // Number of bodies in the simulations
@@ -95,19 +112,13 @@ class FoilSimulation {
     func runAsyncWithUpdateHandler(
         updateHandler: @escaping FoilDataUpdateHandler, dataProvider: @escaping FoilFullDatasetProvider
     ) {
-        print("runAsyncWithUpdateHandler.0")
         DispatchQueue.global(qos: .default).async {
-            print("runAsyncWithUpdateHandler.1")
             self.commandQueue = self.device.makeCommandQueue()
-            print("runAsyncWithUpdateHandler.2")
 
             self.runAsyncLoopWithUpdateHandler(updateHandler: updateHandler)
-            print("runAsyncWithUpdateHandler.3")
 
             self.provideFullData(dataProvider: dataProvider, forSimulationTime: self.simulationTime)
-            print("runAsyncWithUpdateHandler.4")
         }
-        print("runAsyncWithUpdateHandler.5")
     }
 
     // Execute a single frame of the simulation (on the current thread)
@@ -142,20 +153,6 @@ class FoilSimulation {
         self.simulationTime += Double(config.simInterval)
 
         return positions[Int(newBufferIndex)]
-    }
-
-    static func vector_length(_ vector: vector_float3) -> Float { return simd_length(vector) }
-    static func vector_normalize(_ vector: vector_float3) -> vector_float3 { return simd_normalize(vector) }
-
-    /// Utility function providing a random with which to initialize simulation
-    static func generate_random_normalized_vector(min: Float, max: Float, maxlength: Float) -> vector_float3 {
-        var rand = vector_float3()
-
-        repeat {
-            rand = generate_random_vector(min: min, max: max);
-        } while(vector_length(rand) > maxlength)
-
-        return vector_normalize(rand)
     }
 
     /// Initialize Metal objects and set simulation parameters
@@ -250,14 +247,6 @@ class FoilSimulation {
         return (buffer, data)
     }
 
-    static func vector_dot(_ nrpos: vector_float3, _ axis: vector_float3) -> Float {
-        return simd_dot(nrpos, axis)
-    }
-
-    static func vector_cross(_ position: vector_float3, _ axis: vector_float3) -> vector_float3 {
-        return simd_cross(position, axis)
-    }
-
     /// Set the initial positions and velocities of the simulation based upon the simulation's config
     func initializeData() {
         let pscale = config.clusterScale
@@ -273,25 +262,25 @@ class FoilSimulation {
         let velocities = self.velocities[oldBufferIndex].contents().assumingMemoryBound(to: vector_float4.self)
 
         for i in 0..<config.numBodies {
-            let nrpos    = FoilSimulation.generate_random_normalized_vector(min: -1.0, max: 1.0, maxlength: 1.0);
-            let rpos     = generate_random_vector(min: 0.0, max: 1.0);
-            let position = nrpos * (inner + (length * rpos));
+            let nrpos    = FoilMath.generateRandomNormalizedVector(-1.0, 1.0, 1.0)
+            let rpos     = FoilMath.generateRandomVector(0.0, 1.0)
+            let position = nrpos * (inner + (length * rpos))
 
             var p = positions[i]
             p.x = position.x; p.y = position.x; p.z = position.z
             p.w = 1
 
             var axis = vector_float3(0.0, 0.0, 1.0)
-            let scalar = FoilSimulation.vector_dot(nrpos, axis);
+            let scalar = simd_dot(nrpos, axis);
 
             if((1 - scalar) < 1e-6) {
                 axis.x = nrpos.y
                 axis.y = nrpos.x
 
-                axis = FoilSimulation.vector_normalize(axis);
+                axis = simd_normalize(axis);
             }
 
-            let velocity = FoilSimulation.vector_cross(position, axis);
+            let velocity = simd_cross(position, axis);
 
             var v = velocities[i]
             v.x = velocity.x * vscale;
@@ -407,7 +396,7 @@ class FoilSimulation {
     /// Run the asynchronous simulation loop
     func runAsyncLoopWithUpdateHandler(updateHandler: @escaping FoilDataUpdateHandler) {
         var loopCounter = 0
-        print("runAsyncLoopWithUpdateHandler.0(\(loopCounter))")
+
         repeat {
             defer { loopCounter += 1 }
 
@@ -430,20 +419,14 @@ class FoilSimulation {
                 updateHandler(updateData, updateSimulationTime)
             }
 
-            print("runAsyncLoopWithUpdateHandler.9(\(loopCounter))")
             commandBuffer.commit()
 
         } while(simulationTime < config.simDuration && !halt)
-        print("runAsyncLoopWithUpdateHandler.A(\(loopCounter))")
     }
 
     func addCommandCompletionHandler(
         _ commandBuffer: MTLCommandBuffer, _ loopCounter: Int, _ updateHandler: @escaping () -> Void
     ) {
-        commandBuffer.addCompletedHandler { _ in
-            print("runAsyncLoopWithUpdateHandler.6(\(loopCounter))")
-            updateHandler()
-            print("runAsyncLoopWithUpdateHandler.7(\(loopCounter))")
-        }
+        commandBuffer.addCompletedHandler { _ in updateHandler() }
     }
 }

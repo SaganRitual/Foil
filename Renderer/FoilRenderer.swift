@@ -2,22 +2,18 @@ import Foundation
 import MetalKit
 
 class FoilRenderer: NSObject {
-    static let maxConcurrentRenderBuffers = 3
-
-    // The point size (in pixels) of rendered bodied
+    // The point size (in pixels) of rendered bodies
     static let bodyPointSize: Float = 15;
 
     // Size of gaussian map to create rounded smooth points
     static let GaussianMapSize = 64
-
-    let pipelineThrottle: DispatchSemaphore
 
     let gaussianMap: MTLTexture
 
     var device: MTLDevice!
     var commandQueue: MTLCommandQueue!
 
-    var colors: MTLBuffer?
+    var colorsBuffer: MTLBuffer?
 
     // Metal objects
     var depthState: MTLDepthStencilState!
@@ -33,15 +29,16 @@ class FoilRenderer: NSObject {
 
     var renderScale: Float = 0
 
+    let rendererDispatchQueue = DispatchQueue(
+        label: "renderer.q", qos: .default, attributes: [/*serial*/],
+        target: DispatchQueue.global(qos: .default)
+    )
+
     /// Initialize with the MetalKit view with the Metal device used to render.  This MetalKit view
     /// object will also be used to set the pixelFormat and other properties of the drawable
     init(_ mtkView: MTKView) {
         self.device = mtkView.device!
         self.commandQueue = self.device.makeCommandQueue()!
-
-        self.pipelineThrottle = DispatchSemaphore(
-            value: FoilRenderer.maxConcurrentRenderBuffers
-        )
 
         self.gaussianMap = FoilRenderer.generateGaussianMap(self.device)
 
@@ -60,17 +57,7 @@ class FoilRenderer: NSObject {
         numBodies: Int,
         view: MTKView
     ) {
-        // Limit the action in the pipeline; see whether we can increase
-        // the max; the original code is kind of old
-        pipelineThrottle.wait()
-
         commandBuffer.pushDebugGroup("Draw Simulation Data")
-
-        // Add completion hander which signals pipelineThrottle when Metal and the GPU has fully
-        // finished processing the commands encoded this frame.  This indicates when the dynamic
-        // buffers, written to this frame, will no longer be needed by Metal and the GPU, meaning the
-        // buffer contents can be changed without corrupting rendering
-        commandBuffer.addCompletedHandler { [weak self] _ in self?.pipelineThrottle.signal() }
 
         setNumRenderBodies(numBodies)
         updateState()
@@ -89,14 +76,14 @@ class FoilRenderer: NSObject {
         precondition(positionsBuffer.length > 0)
 
         // Synchronize since positions buffer may be created on another thread
-        LikeObjcSync.synced(self) {
+        rendererDispatchQueue.sync {
             renderEncoder.setVertexBuffer(
                 positionsBuffer, offset: 0, index: FoilRenderBufferIndex.positions.rawValue
             )
         }
 
         renderEncoder.setVertexBuffer(
-            colors, offset: 0, index: FoilRenderBufferIndex.colors.rawValue
+            colorsBuffer, offset: 0, index: FoilRenderBufferIndex.colors.rawValue
         )
 
         renderEncoder.setVertexBuffer(
@@ -218,23 +205,19 @@ class FoilRenderer: NSObject {
         depthStateDesc.isDepthWriteEnabled = true;
         depthState = device.makeDepthStencilState(descriptor: depthStateDesc)
 
-        // Create and allocate the dynamic uniform buffer objects.
-        for i in 0..<FoilRenderer.maxConcurrentRenderBuffers {
-            // Indicate shared storage so that both the  CPU can access the buffers
-            let storageMode = MTLResourceOptions.storageModeShared
-            let stride = MemoryLayout<FoilUniform>.stride
-            guard let dub = device.makeBuffer(length: stride, options: storageMode)
-                else { fatalError() }
+        // Indicate shared storage so that both the  CPU can access the buffers
+        let storageMode = MTLResourceOptions.storageModeShared
+        let stride = MemoryLayout<FoilUniform>.stride
+        guard let dub = device.makeBuffer(length: stride, options: storageMode)
+            else { fatalError() }
 
-            dub.label = "UniformBuffer\(i)"
-            dynamicUniformBuffers.append(dub)
-        }
+        dub.label = "UniformBuffer"
+        dynamicUniformBuffers.append(dub)
 
         // Initialize number of bodies to render
         setNumRenderBodies(64 * 1024)
 
         commandQueue = device.makeCommandQueue()
-
     }
 
     /// Update any render state (including updating dynamically changing Metal buffers)
@@ -247,7 +230,7 @@ class FoilRenderer: NSObject {
     }
 
     func providePositionData(data: NSData) {
-        LikeObjcSync.synced(self) {
+        rendererDispatchQueue.sync {
             // Cast from 'const void *' to 'void *' which is okay in this case since updateData was
             // created with -[NSData initWithBytesNoCopy:length:deallocator:] and underlying memory was
             // allocated with vm_allocate
@@ -267,28 +250,28 @@ class FoilRenderer: NSObject {
     }
 
     func setNumRenderBodies(_ numBodies: Int) {
-        if colors == nil || ((colors!.length / MemoryLayout<vector_uchar4>.stride) < numBodies) {
+        if colorsBuffer == nil || ((colorsBuffer!.length / MemoryLayout<vector_uchar4>.stride) < numBodies) {
 
             // If the number of colors stored is less than the number of bodies, recreate the color buffer
 
-            let bufferSize = numBodies * MemoryLayout<simd_uchar4>.stride
+            let bufferSize = numBodies * MemoryLayout<vector_uchar4>.stride
 
-            colors = device.makeBuffer(length: bufferSize, options: .storageModeManaged)
+            colorsBuffer = device.makeBuffer(length: bufferSize, options: .storageModeManaged)
 
-            colors!.label = "Colors";
+            colorsBuffer!.label = "Colors";
 
-            let contents = colors!.contents().bindMemory(to: vector_uchar4.self, capacity: numBodies)
+            let colors = colorsBuffer!.contents().bindMemory(to: vector_uchar4.self, capacity: numBodies)
 
             for i in 0..<numBodies {
-                let randomVector: vector_float3 = generate_random_vector(min: 0, max: 1);
+                let randomVector: vector_float3 = FoilMath.generateRandomVector(0, 1);
 
-                contents[i].x = UInt8(Float(0xFF) * randomVector.x)
-                contents[i].y = UInt8(Float(0xFF) * randomVector.y)
-                contents[i].z = UInt8(Float(0xFF) * randomVector.z)
-                contents[i].w = 0xFF
+                colors[i].x = UInt8(Float(0xFF) * randomVector.x)
+                colors[i].y = UInt8(Float(0xFF) * randomVector.y)
+                colors[i].z = UInt8(Float(0xFF) * randomVector.z)
+                colors[i].w = 0xFF
             }
 
-            colors!.didModifyRange(0..<bufferSize)
+            colorsBuffer!.didModifyRange(0..<bufferSize)
         }
     }
 
@@ -324,7 +307,7 @@ class FoilRenderer: NSObject {
         let near: Float   = 5000;
         let far: Float    = -5000;
 
-        projectionMatrix = matrix_ortho_left_hand(
+        projectionMatrix = FoilMath.matrixOrthoLeftHand(
             left: left, right: right, bottom: bottom, top: top, nearZ: near, farZ: far
         );
     }

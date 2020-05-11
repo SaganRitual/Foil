@@ -2,8 +2,7 @@
 using namespace metal;
 
 #include <simd/simd.h>
-
-#import "FoilKernelTypes.h"
+#include "FoilKernelTypes.h"
 
 static float3 computeAcceleration(const float4 vsPosition,
                                   const float4 oldPosition,

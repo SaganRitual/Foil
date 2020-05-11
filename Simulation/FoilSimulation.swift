@@ -1,7 +1,7 @@
 import Foundation
 import MetalKit
 
-let FoilNumUpdateBuffersStored = 3;
+let FoilNumUpdateBuffersStored = 1;
 
 // Parameters to perform the N-Body simulation
 struct FoilSimulationConfig {
@@ -39,13 +39,10 @@ class FoilSimulation {
     var computePipeline: MTLComputePipelineState!
 
     // Metal buffer backed with memory wrapped in an NSData object for updating client (renderer)
-    var updateBuffer = [MTLBuffer?](repeating: nil, count: FoilNumUpdateBuffersStored)
+    var updateBuffer: MTLBuffer!
 
     // Wrapper for system memory used to transfer to client (renderer)
-    var updateData = [NSData?](repeating: nil, count: FoilNumUpdateBuffersStored)
-
-    // Current buffer to write update simulation data to
-    var currentBufferIndex = 0
+    var updateData: NSData!
 
     // Two buffers to hold positions and velocity.  One will hold data for the previous/initial
     // frame while the other will hold data for the current frame, which is generated using data
@@ -127,7 +124,7 @@ class FoilSimulation {
     }
 
     // Execute a single frame of the simulation (on the current thread)
-    func simulateFrameWithCommandBuffer(commandBuffer: MTLCommandBuffer) -> MTLBuffer {
+    func simulateFrame(commandBuffer: MTLCommandBuffer) -> MTLBuffer {
         commandBuffer.pushDebugGroup("Simulation")
 
         guard let computeEncoder = commandBuffer.makeComputeCommandEncoder()
@@ -137,18 +134,18 @@ class FoilSimulation {
 
         computeEncoder.setComputePipelineState(computePipeline)
 
-        computeEncoder.setBuffer(positions[newBufferIndex],  offset: 0, index: FoilComputeBufferIndex.newPosition.rawValue)
-        computeEncoder.setBuffer(velocities[newBufferIndex], offset: 0, index: FoilComputeBufferIndex.newVelocity.rawValue)
-        computeEncoder.setBuffer(positions[oldBufferIndex],  offset: 0, index: FoilComputeBufferIndex.oldPosition.rawValue)
-        computeEncoder.setBuffer(velocities[oldBufferIndex], offset: 0, index: FoilComputeBufferIndex.oldVelocity.rawValue)
-        computeEncoder.setBuffer(simulationParams,           offset: 0, index: FoilComputeBufferIndex.params.rawValue)
+        computeEncoder.setBuffer(positions[newBufferIndex],  offset: 0, index: Int(FoilComputeBufferIndexNewPosition.rawValue))
+        computeEncoder.setBuffer(velocities[newBufferIndex], offset: 0, index: Int(FoilComputeBufferIndexNewVelocity.rawValue))
+        computeEncoder.setBuffer(positions[oldBufferIndex],  offset: 0, index: Int(FoilComputeBufferIndexOldPosition.rawValue))
+        computeEncoder.setBuffer(velocities[oldBufferIndex], offset: 0, index: Int(FoilComputeBufferIndexOldVelocity.rawValue))
+        computeEncoder.setBuffer(simulationParams,           offset: 0, index: Int(FoilComputeBufferIndexParams.rawValue))
 
         computeEncoder.setThreadgroupMemoryLength(threadgroupMemoryLength, index: 0)
         computeEncoder.dispatchThreads(dispatchExecutionSize, threadsPerThreadgroup: threadsPerThreadgroup)
         computeEncoder.endEncoding()
 
-        // Swap indices to use data generated this frame at _newBufferIndex to generate data for the
-        // next frame and write it to the buffer at _oldBufferIndex
+        // Swap indices to use data generated this frame at newBufferIndex to generate data for the
+        // next frame and write it to the buffer at oldBufferIndex
         let tmpIndex = oldBufferIndex;
         oldBufferIndex = newBufferIndex;
         newBufferIndex = tmpIndex;
@@ -157,7 +154,7 @@ class FoilSimulation {
 
         self.simulationTime += Double(config.simInterval)
 
-        return positions[Int(newBufferIndex)]
+        return positions[newBufferIndex]
     }
 
     /// Initialize Metal objects and set simulation parameters
@@ -205,18 +202,16 @@ class FoilSimulation {
         c.timestep = config.simInterval
         c.damping = config.damping
         c.softeningSqr = config.softeningSqr
-        c.numBodies = config.numBodies
+        c.numBodies = UInt32(config.numBodies)
 
         simulationParams.didModifyRange(0..<sp.length)
 
         // Create buffers to transfer data to our client (i.e. the renderer)
         let updateDataSize = Int(config.renderBodies * MemoryLayout<vector_float3>.stride)
 
-        for i in 0..<FoilNumUpdateBuffersStored {
-            (updateBuffer[i], updateData[i]) = makeBufferForRenderBodiesVectors(
-                bufferSizeInBytes: updateDataSize, label: "Update Buffer(\(i))"
-            )
-        }
+        (updateBuffer, updateData) = makeBufferForRenderBodiesVectors(
+            bufferSizeInBytes: updateDataSize, label: "Update Buffer"
+        )
     }
 
     private func makeBufferForRenderBodiesVectors(
@@ -330,8 +325,7 @@ class FoilSimulation {
     func fillUpdateBufferWithPositionBuffer(
         buffer: MTLBuffer, usingCommandBuffer commandBuffer: MTLCommandBuffer
     ) {
-        guard let blitEncoder = commandBuffer.makeBlitCommandEncoder(),
-            let updateBuffer = self.updateBuffer[currentBufferIndex] else { fatalError() }
+        guard let blitEncoder = commandBuffer.makeBlitCommandEncoder() else { fatalError() }
 
         blitEncoder.label = "Position Update Blit Encoder";
         blitEncoder.pushDebugGroup("Position Update Blit Commands")
@@ -405,23 +399,20 @@ class FoilSimulation {
         repeat {
             defer { loopCounter += 1 }
 
-            currentBufferIndex = (currentBufferIndex + 1) % FoilNumUpdateBuffersStored
-
             guard let commandBuffer = commandQueue.makeCommandBuffer() else
                 { fatalError() }
 
-            let positionBuffer = simulateFrameWithCommandBuffer(commandBuffer: commandBuffer)
+            let positionBuffer = simulateFrame(commandBuffer: commandBuffer)
 
             fillUpdateBufferWithPositionBuffer(
                 buffer: positionBuffer, usingCommandBuffer: commandBuffer
             )
 
             // Pass data back to client to update it with a summary of progress
-            guard let updateData = self.updateData[currentBufferIndex],
-                  let updateSimulationTime = simulationTime else { fatalError() }
+            guard let updateSimulationTime = simulationTime else { fatalError() }
 
             addCommandCompletionHandler(commandBuffer, loopCounter) {
-                updateHandler(updateData, updateSimulationTime)
+                updateHandler(self.updateData, updateSimulationTime)
             }
 
             commandBuffer.commit()

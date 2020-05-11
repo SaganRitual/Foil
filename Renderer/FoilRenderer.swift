@@ -8,7 +8,7 @@ class FoilRenderer: NSObject {
     // Size of gaussian map to create rounded smooth points
     static let GaussianMapSize = 64
 
-    let gaussianMap: MTLTexture
+    var gaussianMap: MTLTexture!
 
     var device: MTLDevice!
     var commandQueue: MTLCommandQueue!
@@ -25,7 +25,7 @@ class FoilRenderer: NSObject {
     var currentBufferIndex = 0
 
     // Projection matrix calculated as a function of view size
-    var projectionMatrix: matrix_float4x4!
+    var projectionMatrix = matrix_float4x4()
 
     var renderScale: Float = 0
 
@@ -38,13 +38,12 @@ class FoilRenderer: NSObject {
     /// object will also be used to set the pixelFormat and other properties of the drawable
     init(_ mtkView: MTKView) {
         self.device = mtkView.device!
-        self.commandQueue = self.device.makeCommandQueue()!
-
-        self.gaussianMap = FoilRenderer.generateGaussianMap(self.device)
 
         super.init()
 
         self.loadMetal(mtkView: mtkView)
+
+        self.gaussianMap = FoilRenderer.generateGaussianMap(self.device)
     }
 
     /// Update the projection matrix with a new drawable size
@@ -78,21 +77,21 @@ class FoilRenderer: NSObject {
         // Synchronize since positions buffer may be created on another thread
         rendererDispatchQueue.sync {
             renderEncoder.setVertexBuffer(
-                positionsBuffer, offset: 0, index: FoilRenderBufferIndex.positions.rawValue
+                positionsBuffer, offset: 0, index: Int(FoilRenderBufferIndexPositions.rawValue)
             )
         }
 
         renderEncoder.setVertexBuffer(
-            colorsBuffer, offset: 0, index: FoilRenderBufferIndex.colors.rawValue
+            colorsBuffer, offset: 0, index: Int(FoilRenderBufferIndexColors.rawValue)
         )
 
         renderEncoder.setVertexBuffer(
             dynamicUniformBuffers[currentBufferIndex],
-            offset: 0, index: FoilRenderBufferIndex.uniforms.rawValue
+            offset: 0, index: Int(FoilRenderBufferIndexUniforms.rawValue)
         )
 
         renderEncoder.setFragmentTexture(
-            gaussianMap, index: FoilTextureIndex.colorMap.rawValue
+            gaussianMap, index: Int(FoilTextureIndexColorMap.rawValue)
         )
 
         renderEncoder.drawPrimitives(
@@ -122,28 +121,26 @@ class FoilRenderer: NSObject {
 
         // Calculate the size of a RGBA8Unorm texture's data and allocate system memory buffer
         // used to fill the texture's memory
-        let dataSize = textureDescriptor.width * textureDescriptor.height
+        let dataSize = textureDescriptor.width * textureDescriptor.height * MemoryLayout<UInt8>.size
 
         let nDelta: vector_float2 = [2.0 / Float(textureDescriptor.width), 2.0 / Float(textureDescriptor.height)]
 
         var texelData = [UInt8](repeating: 0, count: dataSize)
 
-        var SNormCoordinate = vector_float2(repeating: -1)
-
         var i = 0
 
         // Procedurally generate data to fill the texture's buffer
         for y in 0..<textureDescriptor.height {
-            SNormCoordinate.y = -1.0 + Float(y) * nDelta.y;
+            let sNormY = -1.0 + Float(y) * nDelta.y
 
             for x in 0..<textureDescriptor.width {
-                SNormCoordinate.x = -1.0 + Float(x) * nDelta.x;
+                let sNormX = -1.0 + Float(x) * nDelta.x;
 
-                let distance = sqrt(SNormCoordinate.x * SNormCoordinate.x + SNormCoordinate.y * SNormCoordinate.y)
-                let t = (distance  < 1.0) ? distance : 1.0;
+                let sNormVector = simd_make_float2(sNormX, sNormY)
+                let h = min(1.0, simd_length(sNormVector))
 
                 // Hermite interpolation where u = {1, 0} and v = {0, 0}
-                let color = ((2.0 * t - 3.0) * t * t + 1.0);
+                let color = (2.0 * h - 3.0) * h * h + 1.0
 
                 texelData[i] = UInt8(Float(0xFF) * color)
 
@@ -157,7 +154,7 @@ class FoilRenderer: NSObject {
 
         gaussianMap!.replace(
             region: region, mipmapLevel: 0, withBytes: texelData,
-            bytesPerRow: textureDescriptor.width * MemoryLayout<UInt8>.stride
+            bytesPerRow: textureDescriptor.width * MemoryLayout<UInt8>.size
         )
 
         gaussianMap!.label = "Gaussian Map"
@@ -207,15 +204,12 @@ class FoilRenderer: NSObject {
 
         // Indicate shared storage so that both the  CPU can access the buffers
         let storageMode = MTLResourceOptions.storageModeShared
-        let stride = MemoryLayout<FoilUniform>.stride
+        let stride = MemoryLayout<FoilUniforms>.stride
         guard let dub = device.makeBuffer(length: stride, options: storageMode)
             else { fatalError() }
 
         dub.label = "UniformBuffer"
         dynamicUniformBuffers.append(dub)
-
-        // Initialize number of bodies to render
-        setNumRenderBodies(64 * 1024)
 
         commandQueue = device.makeCommandQueue()
     }
@@ -223,7 +217,7 @@ class FoilRenderer: NSObject {
     /// Update any render state (including updating dynamically changing Metal buffers)
     func updateState() {
         let uniforms = dynamicUniformBuffers[currentBufferIndex].contents()
-        var u = uniforms.assumingMemoryBound(to: FoilUniform.self).pointee
+        var u = uniforms.assumingMemoryBound(to: FoilUniforms.self).pointee
 
         u.pointSize = FoilRenderer.bodyPointSize
         u.mvpMatrix = projectionMatrix

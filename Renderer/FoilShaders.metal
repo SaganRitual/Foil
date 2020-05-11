@@ -8,10 +8,9 @@ Metal shaders used for this sample
 #include <metal_stdlib>
 #include <simd/simd.h>
 
-using namespace metal;
+#include "FoilShaderTypes.h"
 
-// Include header shared between this Metal shader code and C code executing Metal API commands
-#import "FoilShaderTypes.h"
+using namespace metal;
 
 // Vertex shader outputs and per-fragment inputs
 typedef struct

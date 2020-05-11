@@ -108,16 +108,16 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
         precondition(!availableDevices.isEmpty, "Metal is not supported on this Mac")
 
-        computeDevice = availableDevices[RadeonGPUInMetalDevicesArray]
+        computeDevice = availableDevices[IntelGPUInMetalDevicesArray]
         NSLog("Selected compute device: \(computeDevice.name)")
 
         // Select renderer device
-        let rendererDevice = availableDevices[RadeonGPUInMetalDevicesArray]
+        let rendererDevice = availableDevices[IntelGPUInMetalDevicesArray]
 
         if rendererDevice !== _view.device {
             _view.device = rendererDevice;
 
-            NSLog("New render device: '\(rendererDevice.name)'")
+            NSLog("New render device: '\(rendererDevice.name)', drawableSize \(_view.drawableSize)")
 
             renderer = FoilRenderer(_view)
             renderer.drawableSizeWillChange(size: _view.drawableSize)
@@ -293,7 +293,7 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
             // Simulate the frame and obtain the new positions for the update.  If this is the final
             // frame positionBuffer will be filled with the all positions used for the simulation
-            let positionBuffer = simulation.simulateFrameWithCommandBuffer(commandBuffer: commandBuffer)
+            let positionBuffer = simulation.simulateFrame(commandBuffer: commandBuffer)
 
             // Render the updated positions (or all positions in the case that the simulation is complete)
             renderer.drawWithCommandBuffer(

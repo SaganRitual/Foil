@@ -8,8 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		D42B958B24648E2900F4B5B0 /* FoilShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = D42B958A24648E2900F4B5B0 /* FoilShaders.metal */; };
-		D462CC9B2464920600D79B48 /* FoilShaderTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D462CC9A2464920600D79B48 /* FoilShaderTypes.swift */; };
 		D462CC9D2466652400D79B48 /* LikeObjcSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D462CC9C2466652400D79B48 /* LikeObjcSync.swift */; };
+		D475693E2469259D000F87AE /* OFoilRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = D475693D2469259D000F87AE /* OFoilRenderer.m */; };
 		D4AC68B8245CF43F00917569 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AC68B7245CF43F00917569 /* AppDelegate.swift */; };
 		D4AC68BA245CF43F00917569 /* FoilViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AC68B9245CF43F00917569 /* FoilViewController.swift */; };
 		D4AC68BC245CF44000917569 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D4AC68BB245CF44000917569 /* Assets.xcassets */; };
@@ -17,17 +17,17 @@
 		D4AC68C9245CF57A00917569 /* FoilRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AC68C8245CF57A00917569 /* FoilRenderer.swift */; };
 		D4BE16FA2463D7390085FD3C /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D4BE16F92463D7390085FD3C /* MetalKit.framework */; };
 		D4BE16FE2463F0E10085FD3C /* FoilKernels.metal in Sources */ = {isa = PBXBuildFile; fileRef = D4BE16FD2463F0E10085FD3C /* FoilKernels.metal */; };
-		D4BE17002463F23C0085FD3C /* FoilKernelTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BE16FF2463F23C0085FD3C /* FoilKernelTypes.swift */; };
 		D4F680AC245FACB3000B8EF2 /* FoilSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F680AB245FACB3000B8EF2 /* FoilSimulation.swift */; };
-		D4F680B02460A5E7000B8EF2 /* FoilKernelTypes.h in Sources */ = {isa = PBXBuildFile; fileRef = D4F680AF2460A5E7000B8EF2 /* FoilKernelTypes.h */; };
 		D4F680BE24639638000B8EF2 /* FoilMathUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F680BD24639638000B8EF2 /* FoilMathUtilities.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		D42B958A24648E2900F4B5B0 /* FoilShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = FoilShaders.metal; sourceTree = "<group>"; };
-		D42B958C24648EDE00F4B5B0 /* FoilShaderTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FoilShaderTypes.h; sourceTree = "<group>"; };
-		D462CC9A2464920600D79B48 /* FoilShaderTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoilShaderTypes.swift; sourceTree = "<group>"; };
 		D462CC9C2466652400D79B48 /* LikeObjcSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikeObjcSync.swift; sourceTree = "<group>"; };
+		D475693C2469259D000F87AE /* Foil-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Foil-Bridging-Header.h"; sourceTree = "<group>"; };
+		D475693D2469259D000F87AE /* OFoilRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OFoilRenderer.m; sourceTree = "<group>"; };
+		D475693F24692638000F87AE /* FoilShaderTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FoilShaderTypes.h; sourceTree = "<group>"; };
+		D47569402469267E000F87AE /* FoilKernelTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FoilKernelTypes.h; sourceTree = "<group>"; };
 		D4AC68B4245CF43F00917569 /* Foil.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Foil.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D4AC68B7245CF43F00917569 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D4AC68B9245CF43F00917569 /* FoilViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoilViewController.swift; sourceTree = "<group>"; };
@@ -38,9 +38,7 @@
 		D4AC68C8245CF57A00917569 /* FoilRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoilRenderer.swift; sourceTree = "<group>"; };
 		D4BE16F92463D7390085FD3C /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		D4BE16FD2463F0E10085FD3C /* FoilKernels.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = FoilKernels.metal; sourceTree = "<group>"; };
-		D4BE16FF2463F23C0085FD3C /* FoilKernelTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoilKernelTypes.swift; sourceTree = "<group>"; };
 		D4F680AB245FACB3000B8EF2 /* FoilSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoilSimulation.swift; sourceTree = "<group>"; };
-		D4F680AF2460A5E7000B8EF2 /* FoilKernelTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FoilKernelTypes.h; sourceTree = "<group>"; };
 		D4F680BD24639638000B8EF2 /* FoilMathUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoilMathUtilities.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -85,6 +83,8 @@
 				D4AC68C0245CF44000917569 /* Info.plist */,
 				D462CC9C2466652400D79B48 /* LikeObjcSync.swift */,
 				D4AC68BD245CF44000917569 /* Main.storyboard */,
+				D475693D2469259D000F87AE /* OFoilRenderer.m */,
+				D475693C2469259D000F87AE /* Foil-Bridging-Header.h */,
 			);
 			path = Foil;
 			sourceTree = "<group>";
@@ -95,8 +95,7 @@
 				D4F680BD24639638000B8EF2 /* FoilMathUtilities.swift */,
 				D4AC68C8245CF57A00917569 /* FoilRenderer.swift */,
 				D42B958A24648E2900F4B5B0 /* FoilShaders.metal */,
-				D42B958C24648EDE00F4B5B0 /* FoilShaderTypes.h */,
-				D462CC9A2464920600D79B48 /* FoilShaderTypes.swift */,
+				D475693F24692638000F87AE /* FoilShaderTypes.h */,
 			);
 			path = Renderer;
 			sourceTree = "<group>";
@@ -113,8 +112,7 @@
 			isa = PBXGroup;
 			children = (
 				D4BE16FD2463F0E10085FD3C /* FoilKernels.metal */,
-				D4F680AF2460A5E7000B8EF2 /* FoilKernelTypes.h */,
-				D4BE16FF2463F23C0085FD3C /* FoilKernelTypes.swift */,
+				D47569402469267E000F87AE /* FoilKernelTypes.h */,
 				D4F680AB245FACB3000B8EF2 /* FoilSimulation.swift */,
 			);
 			path = Simulation;
@@ -152,6 +150,7 @@
 				TargetAttributes = {
 					D4AC68B3245CF43F00917569 = {
 						CreatedOnToolsVersion = 11.2;
+						LastSwiftMigration = 1120;
 					};
 				};
 			};
@@ -194,12 +193,10 @@
 				D4AC68C9245CF57A00917569 /* FoilRenderer.swift in Sources */,
 				D462CC9D2466652400D79B48 /* LikeObjcSync.swift in Sources */,
 				D4AC68BA245CF43F00917569 /* FoilViewController.swift in Sources */,
-				D4F680B02460A5E7000B8EF2 /* FoilKernelTypes.h in Sources */,
 				D42B958B24648E2900F4B5B0 /* FoilShaders.metal in Sources */,
-				D4BE17002463F23C0085FD3C /* FoilKernelTypes.swift in Sources */,
 				D4F680AC245FACB3000B8EF2 /* FoilSimulation.swift in Sources */,
 				D4F680BE24639638000B8EF2 /* FoilMathUtilities.swift in Sources */,
-				D462CC9B2464920600D79B48 /* FoilShaderTypes.swift in Sources */,
+				D475693E2469259D000F87AE /* OFoilRenderer.m in Sources */,
 				D4AC68B8245CF43F00917569 /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -337,6 +334,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Foil/Foil.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -349,6 +347,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.boringsoftware.Foil;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "Foil/Foil-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -357,6 +357,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Foil/Foil.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -369,6 +370,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.boringsoftware.Foil;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "Foil/Foil-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

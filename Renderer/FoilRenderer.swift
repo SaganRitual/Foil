@@ -1,16 +1,24 @@
 import Foundation
 import MetalKit
 
-class FoilRenderer: NSObject {
+class FoilRenderer: NSObject, MTKViewDelegate {
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        print("mtkview")
+    }
+
+    func draw(in view: MTKView) {
+        viewController.draw(in: view)
+    }
+
     // The point size (in pixels) of rendered bodies
-    static let bodyPointSize: Float = 15;
+    static let bodyPointSize: Float = 15
 
     // Size of gaussian map to create rounded smooth points
     static let GaussianMapSize = 64
 
     var gaussianMap: MTLTexture!
 
-    var device: MTLDevice!
+    var device: MTLDevice { view.device! }
     var commandQueue: MTLCommandQueue!
 
     var colorsBuffer: MTLBuffer?
@@ -20,6 +28,9 @@ class FoilRenderer: NSObject {
     var dynamicUniformBuffers = [MTLBuffer]()
     var positionsBuffer: MTLBuffer!
     var renderPipeline: MTLRenderPipelineState!
+
+    let view: MTKView
+    let viewController: FoilViewController
 
     // Current buffer to fill with dynamic uniform data and set for the current frame
     var currentBufferIndex = 0
@@ -36,25 +47,32 @@ class FoilRenderer: NSObject {
 
     /// Initialize with the MetalKit view with the Metal device used to render.  This MetalKit view
     /// object will also be used to set the pixelFormat and other properties of the drawable
-    init(_ mtkView: MTKView) {
-        self.device = mtkView.device!
+    init(_ viewController: FoilViewController, _ rendererDevice: MTLDevice) {
+        self.view = (viewController.view as? MTKView)!
+        self.view.device = rendererDevice
+        self.viewController = viewController
 
         super.init()
 
-        self.loadMetal(mtkView: mtkView)
+        self.view.delegate = self
 
-        self.gaussianMap = FoilRenderer.generateGaussianMap(self.device)
+        self.loadMetal()
+        self.generateGaussianMap()
+
+        updateProjectionMatrix()
     }
 
     /// Update the projection matrix with a new drawable size
-    func drawableSizeWillChange(size: CGSize) { updateProjectionMatrix(with: size) }
+    func drawableSizeWillChange(size: CGSize) {
+        print("dswc(CGSize)")
+        updateProjectionMatrix()
+    }
 
     /// Draw particles at the supplied positions using the given command buffer to the given view
     func drawWithCommandBuffer(
         commandBuffer: MTLCommandBuffer,
         positionsBuffer: MTLBuffer,
-        numBodies: Int,
-        view: MTKView
+        numBodies: Int
     ) {
         commandBuffer.pushDebugGroup("Draw Simulation Data")
 
@@ -68,7 +86,7 @@ class FoilRenderer: NSObject {
               let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
             else { fatalError() }
 
-        renderEncoder.label = "Render Commands";
+        renderEncoder.label = "Render Commands"
         renderEncoder.setRenderPipelineState(renderPipeline)
 
         // In objective-c, this was "if(positionsBuffer)" -- not sure what to make of it
@@ -106,7 +124,7 @@ class FoilRenderer: NSObject {
     }
 
     /// Generates a texture to make rounded points for particles
-    static func generateGaussianMap(_ device: MTLDevice) -> MTLTexture {
+    func generateGaussianMap() {
         let textureDescriptor = MTLTextureDescriptor()
 
         textureDescriptor.textureType = .type2D
@@ -117,11 +135,11 @@ class FoilRenderer: NSObject {
         textureDescriptor.cpuCacheMode = .defaultCache
         textureDescriptor.usage = .shaderRead
 
-        let gaussianMap = device.makeTexture(descriptor: textureDescriptor)
+        self.gaussianMap = device.makeTexture(descriptor: textureDescriptor)
 
         // Calculate the size of a RGBA8Unorm texture's data and allocate system memory buffer
         // used to fill the texture's memory
-        let dataSize = textureDescriptor.width * textureDescriptor.height * MemoryLayout<UInt8>.size
+        let dataSize = textureDescriptor.width * textureDescriptor.height * MemoryLayout<UInt8>.stride
 
         let nDelta: vector_float2 = [2.0 / Float(textureDescriptor.width), 2.0 / Float(textureDescriptor.height)]
 
@@ -134,7 +152,7 @@ class FoilRenderer: NSObject {
             let sNormY = -1.0 + Float(y) * nDelta.y
 
             for x in 0..<textureDescriptor.width {
-                let sNormX = -1.0 + Float(x) * nDelta.x;
+                let sNormX = -1.0 + Float(x) * nDelta.x
 
                 let sNormVector = simd_make_float2(sNormX, sNormY)
                 let h = min(1.0, simd_length(sNormVector))
@@ -152,17 +170,15 @@ class FoilRenderer: NSObject {
         let size = MTLSize(width: textureDescriptor.width, height: textureDescriptor.height, depth: 1)
         let region = MTLRegion(origin: origin, size: size)
 
-        gaussianMap!.replace(
+        gaussianMap.replace(
             region: region, mipmapLevel: 0, withBytes: texelData,
-            bytesPerRow: textureDescriptor.width * MemoryLayout<UInt8>.size
+            bytesPerRow: textureDescriptor.width * MemoryLayout<UInt8>.stride
         )
 
-        gaussianMap!.label = "Gaussian Map"
-
-        return gaussianMap!
+        gaussianMap.label = "Gaussian Map"
     }
 
-    func loadMetal(mtkView: MTKView) {
+    func loadMetal() {
         // Load all the shader files with a .metal file extension in the project
         guard let defaultLibrary = device.makeDefaultLibrary() else { fatalError() }
 
@@ -172,25 +188,26 @@ class FoilRenderer: NSObject {
         // Load the fragment function from the library
         let fragmentFunction = defaultLibrary.makeFunction(name: "fragmentShader")
 
-        mtkView.depthStencilPixelFormat = MTLPixelFormat.depth32Float_stencil8
-        mtkView.colorPixelFormat = MTLPixelFormat.bgra8Unorm;
-        mtkView.sampleCount = 1;
+        view.depthStencilPixelFormat = MTLPixelFormat.depth32Float_stencil8
+        view.colorPixelFormat = MTLPixelFormat.bgra8Unorm
+        view.sampleCount = 1
 
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.label = "RenderPipeline";
-        pipelineDescriptor.sampleCount = mtkView.sampleCount;
-        pipelineDescriptor.vertexFunction = vertexFunction;
-        pipelineDescriptor.fragmentFunction = fragmentFunction;
-        pipelineDescriptor.colorAttachments[0].pixelFormat = mtkView.colorPixelFormat;
-        pipelineDescriptor.depthAttachmentPixelFormat = mtkView.depthStencilPixelFormat;
-        pipelineDescriptor.stencilAttachmentPixelFormat = mtkView.depthStencilPixelFormat;
-        pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true;
-        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperation.add;
-        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperation.add;
-        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactor.sourceAlpha;
-        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor  = MTLBlendFactor.sourceAlpha;
-        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactor.one;
-        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactor.one;
+        pipelineDescriptor.label = "RenderPipeline"
+        pipelineDescriptor.sampleCount = view.sampleCount
+        pipelineDescriptor.vertexFunction = vertexFunction
+        pipelineDescriptor.fragmentFunction = fragmentFunction
+        pipelineDescriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
+        pipelineDescriptor.stencilAttachmentPixelFormat = view.depthStencilPixelFormat
+
+        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperation.add
+        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactor.one
+        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactor.one
+        pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
+        pipelineDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
+        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperation.add
+        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor  = MTLBlendFactor.sourceAlpha
+        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactor.sourceAlpha
 
         guard let rp = try? device.makeRenderPipelineState(descriptor: pipelineDescriptor)
             else { fatalError("Failed to create render pipeline state") }
@@ -198,8 +215,8 @@ class FoilRenderer: NSObject {
         self.renderPipeline = rp
 
         let depthStateDesc = MTLDepthStencilDescriptor()
-        depthStateDesc.depthCompareFunction = MTLCompareFunction.less;
-        depthStateDesc.isDepthWriteEnabled = true;
+        depthStateDesc.depthCompareFunction = MTLCompareFunction.less
+        depthStateDesc.isDepthWriteEnabled = true
         depthState = device.makeDepthStencilState(descriptor: depthStateDesc)
 
         // Indicate shared storage so that both the  CPU can access the buffers
@@ -236,10 +253,10 @@ class FoilRenderer: NSObject {
                 options: .storageModeManaged, deallocator: nil
             ) else { fatalError() }
 
-            positionsBuffer.label = "Provided Positions";
+            positionsBuffer.label = "Provided Positions"
             positionsBuffer.didModifyRange(0..<data.length)
 
-            self.positionsBuffer = positionsBuffer;
+            self.positionsBuffer = positionsBuffer
         }
     }
 
@@ -252,12 +269,12 @@ class FoilRenderer: NSObject {
 
             colorsBuffer = device.makeBuffer(length: bufferSize, options: .storageModeManaged)
 
-            colorsBuffer!.label = "Colors";
+            colorsBuffer!.label = "Colors"
 
             let colors = colorsBuffer!.contents().bindMemory(to: vector_uchar4.self, capacity: numBodies)
 
             for i in 0..<numBodies {
-                let randomVector: vector_float3 = FoilMath.generateRandomVector(0, 1);
+                let randomVector: vector_float3 = FoilMath.generateRandomVector(0, 1)
 
                 colors[i].x = UInt8(Float(0xFF) * randomVector.x)
                 colors[i].y = UInt8(Float(0xFF) * randomVector.y)
@@ -269,40 +286,39 @@ class FoilRenderer: NSObject {
         }
     }
 
-    func drawProvidedPositionDataWithNumBodies(
-        numParticles: Int, inView: MTKView
-    ) {
+    func drawProvidedPositionDataWithNumBodies(numParticles: Int) {
         // Create a new command buffer for each render pass to the current drawable
         guard let commandBuffer = commandQueue.makeCommandBuffer() else { fatalError() }
         commandBuffer.label = "Render Command Buffer"
 
         drawWithCommandBuffer(
-            commandBuffer: commandBuffer, positionsBuffer: positionsBuffer,
-            numBodies: numParticles, view: inView
+            commandBuffer: commandBuffer,
+            positionsBuffer: positionsBuffer,
+            numBodies: numParticles
         )
 
         // Finalize rendering here & push the command buffer to the GPU
         commandBuffer.commit()
     }
 
-    func setRenderScale(renderScale: Float, drawableSize: CGSize) {
-        self.renderScale = renderScale;
-        updateProjectionMatrix(with: drawableSize)
+    func setRenderScale(renderScale: Float) {
+        self.renderScale = renderScale
+        updateProjectionMatrix()
     }
 
-    func updateProjectionMatrix(with size: CGSize) {
+    func updateProjectionMatrix() {
         // React to resize of the draw rect.  In particular update the perspective matrix.
         // Update the aspect ratio and projection matrix since the view orientation or size has changed
-        let aspect: Float = Float(size.height) / Float(size.width)
-        let left: Float   = renderScale;
-        let right: Float  = -renderScale;
-        let bottom: Float = renderScale * aspect;
-        let top: Float    = -renderScale * aspect;
-        let near: Float   = 5000;
-        let far: Float    = -5000;
+        let aspect: Float = Float(view.drawableSize.height) / Float(view.drawableSize.width)
+        let left: Float   = renderScale
+        let right: Float  = -renderScale
+        let bottom: Float = renderScale * aspect
+        let top: Float    = -renderScale * aspect
+        let near: Float   = 5000
+        let far: Float    = -5000
 
         projectionMatrix = FoilMath.matrixOrthoLeftHand(
             left: left, right: right, bottom: bottom, top: top, nearZ: near, farZ: far
-        );
+        )
     }
 }

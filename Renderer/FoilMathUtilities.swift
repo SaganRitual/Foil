@@ -5,18 +5,18 @@ enum FoilMath {
         var rand = vector_float3()
 
         repeat {
-            rand = generateRandomVector(min, max);
+            rand = generateRandomVector(min, max)
         } while(simd_length(rand) > maxlength)
 
         return simd_normalize(rand)
     }
 
     static func generateRandomVector(_ min: Float, _ max: Float) -> vector_float3 {
-        let range = max - min;
+        let range = max - min
 
-        let x = Float.random(in: 0..<1) * range + min;
-        let y = Float.random(in: 0..<1) * range + min;
-        let z = Float.random(in: 0..<1) * range + min;
+        let x = Float.random(in: 0..<1) * range + min
+        let y = Float.random(in: 0..<1) * range + min
+        let z = Float.random(in: 0..<1) * range + min
 
         return vector_float3(x, y, z)
     }
@@ -28,7 +28,7 @@ enum FoilMath {
             2 / (right - left),                  0,                  0, (left + right) / (left - right),
                              0, 2 / (top - bottom),                  0, (top + bottom) / (bottom - top),
                              0,                  0, 1 / (farZ - nearZ),          nearZ / (nearZ - farZ),
-                             0,                  0,                  0,                               1 );
+                             0,                  0,                  0,                               1 )
     }
 
     static func matriMakeRows(

@@ -9,11 +9,7 @@
 import Cocoa
 import MetalKit
 
-class FoilViewController: NSViewController, MTKViewDelegate {
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        assert(false)
-    }
-
+class FoilViewController: NSViewController {
     let IntelGPUInMetalDevicesArray = 0
     let RadeonGPUInMetalDevicesArray = 1
 
@@ -36,8 +32,6 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
     static let FoilNumSimulationConfigs = FoilSimulationConfigTable.count
 
-//    var _view: MTKView { guard let v = self.view as? MTKView else { fatalError() }; return v }
-    var _view: MTKView { (self.view as? MTKView)! }
     var renderer: FoilRenderer!
     var simulation: FoilSimulation!
 
@@ -88,7 +82,7 @@ class FoilViewController: NSViewController, MTKViewDelegate {
         super.viewDidLoad()
         selectDevices()
 
-        _view.delegate = self
+//        _view.delegate = self
     }
 
     override func viewDidAppear() { beginSimulation() }
@@ -96,10 +90,10 @@ class FoilViewController: NSViewController, MTKViewDelegate {
     override func viewDidDisappear() {
         viewControllerispatchQueue.sync {
             // Stop simulation if on another thread
-            self.simulation.halt = true;
+            self.simulation.halt = true
 
             // Indicate that simulation should not continue and results will not be needed
-            self.terminateAllSimulations = true;
+            self.terminateAllSimulations = true
         }
     }
 
@@ -108,140 +102,43 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
         precondition(!availableDevices.isEmpty, "Metal is not supported on this Mac")
 
-        computeDevice = availableDevices[IntelGPUInMetalDevicesArray]
+        computeDevice = availableDevices[RadeonGPUInMetalDevicesArray]
         NSLog("Selected compute device: \(computeDevice.name)")
 
         // Select renderer device
-        let rendererDevice = availableDevices[IntelGPUInMetalDevicesArray]
+        let rendererDevice = availableDevices[RadeonGPUInMetalDevicesArray]
 
-        if rendererDevice !== _view.device {
-            _view.device = rendererDevice;
+        renderer = FoilRenderer(self, rendererDevice)
 
-            NSLog("New render device: '\(rendererDevice.name)', drawableSize \(_view.drawableSize)")
-
-            renderer = FoilRenderer(_view)
-            renderer.drawableSizeWillChange(size: _view.drawableSize)
-        }
+        NSLog("New render device: \"\(rendererDevice.name)\"")
     }
 
     func beginSimulation() {
-        simulationTime = 0;
+        simulationTime = 0
 
         _simulationName.stringValue = "Simulation \(configNum)"
         config = FoilViewController.FoilSimulationConfigTable[configNum]
 
         simulation = FoilSimulation(computeDevice: computeDevice, config: config)
 
-        renderer.setRenderScale(renderScale: config.renderScale, drawableSize: _view.drawableSize)
+        renderer.setRenderScale(renderScale: config.renderScale)
 
-        NSLog("Starting Simulation Config: \(configNum)");
+        commandQueue = renderer.device.makeCommandQueue()
 
-        if computeDevice === renderer.device {
-            // If the device used for rendering and compute are the same, create a command queue shared
-            // by both components
-            commandQueue = renderer.device.makeCommandQueue()
-        } else {
-            // If the device used for rendering is different than that used for compute, run the
-            // the simulation asynchronously on the compute device
-            runSimulationOnAlternateDevice()
-        }
+        NSLog("Starting Simulation Config: \(configNum)")
     }
-
-    // Asynchronously begins or continues a simulation on a different than the device used for rendering
-    func runSimulationOnAlternateDevice() {
-        assert(computeDevice !== renderer.device)
-
-        commandQueue = nil;
-
-        let updateHandler: (NSData, CFAbsoluteTime) -> () = {
-            // Update the renderer's position data so that it can show forward progress
-            self.updateWithNewPositionData(updateData: $0, forSimulationTime: $1)
-        }
-
-        let dataProvider: (NSData, NSData, CFAbsoluteTime) -> () = {
-            self.handleFullyProvidedSetOfPositionData(positionData: $0, velocityData: $1, forSimulationTime: $2)
-        }
-
-        simulation.runAsyncWithUpdateHandler(updateHandler: updateHandler, dataProvider: dataProvider)
-    }
-
-    /// Receive and update of new positions for the simulation time given.
-    func updateWithNewPositionData(updateData: NSData, forSimulationTime simulationTime: CFAbsoluteTime) {
-        // Lock with updateData so thus thread does not update data during an update on another thread
-        dataUpdateDispatchQueue.sync {
-            // Update the renderer's position data so that it can show forward progress
-            self.renderer.providePositionData(data: updateData)
-        }
-
-        viewControllerispatchQueue.sync {
-            // Lock around _simulation time since it will be accessed on another thread
-            self.simulationTime = simulationTime;
-        }
-    }
-
-    // Handle the passing of full data set from asynchronous simulation executed on device different
-    // the the device used for rendering
-    func handleFullyProvidedSetOfPositionData(
-        positionData: NSData, velocityData: NSData,
-        forSimulationTime simulationTime: CFAbsoluteTime
-    ) {
-        viewControllerispatchQueue.sync {
-            if self.terminateAllSimulations {
-                NSLog("Terminating all simulations")
-                return
-            }
-
-            self.simulationTime = simulationTime;
-
-            if simulationTime >= config.simDuration {
-                NSLog("Simulation Config \(configNum) Complete")
-
-                // If the simulation is complete, provide all the final positions to render
-                renderer.providePositionData(data: positionData)
-            } else {
-                NSLog("Simulation Config \(configNum) Cannot complete with current simulation object")
-
-                // If the simulation is not complete, this indicates that compute device cannot complete
-                // the simulation, so data has been transferred from that device so the app can continue
-                // the simulation on another device
-
-                // Reselect a new device to continue the simulation
-                selectDevices()
-
-                // Create a new simulation object with the data provided
-                self.simulation = FoilSimulation(
-                    computeDevice: computeDevice, config: config,
-                    positionData: positionData, velocityData: velocityData,
-                    simulationTime: simulationTime
-                )
-
-                if computeDevice === renderer.device {
-                    // If the device used for rendering and compute are the same, create a command queue shared
-                    // by both components
-                    commandQueue = renderer.device.makeCommandQueue()
-                } else {
-                    // If the device used for rendering is different than that used for compute, run the
-                    // the simulation asynchronously on the compute device
-                    runSimulationOnAlternateDevice()
-                }
-            }
-        }
-    }
-
-    /// Called whenever view changes orientation or layout is changed
-    func drawableSizeWillChange(size: CGSize) { renderer.drawableSizeWillChange(size: size) }
 
     static let FoilSecondsToPresentSimulationResults = CFTimeInterval(4.0)
 
     /// Called whenever the view needs to render
     func draw(in view: MTKView) {
         // Number of bodies to render this frame
-        var numBodies = config.renderBodies;
+        var numBodies = config.renderBodies
 
         // Handle simulations completion
         if(simulationTime >= config.simDuration) {
             // If the simulation is over, render all the bodies in the simulation to show final results
-            numBodies = config.numBodies;
+            numBodies = config.numBodies
 
             if(continuationTime == 0) {
                 continuationTime = CACurrentMediaTime() + FoilViewController.FoilSecondsToPresentSimulationResults
@@ -256,8 +153,8 @@ class FoilViewController: NSViewController, MTKViewDelegate {
                 }
 
                 let animationCompletion: () -> () = {
-                    self._simulationName.alphaValue = 1.0;
-                    self._simulationPercentage.alphaValue = 1.0;
+                    self._simulationName.alphaValue = 1.0
+                    self._simulationPercentage.alphaValue = 1.0
                 }
 
                 let blinkyBlock: (Timer) -> () = { timer in
@@ -270,9 +167,9 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
             } else if(CACurrentMediaTime() >= continuationTime) {
                 // If the continuation time has been reached, select a new simulation and begin execution
-                configNum = (configNum + 1) % FoilViewController.FoilNumSimulationConfigs;
+                configNum = (configNum + 1) % FoilViewController.FoilNumSimulationConfigs
 
-                continuationTime = 0;
+                continuationTime = 0
 
                 blinker.invalidate()
                 blinker = nil
@@ -297,8 +194,9 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
             // Render the updated positions (or all positions in the case that the simulation is complete)
             renderer.drawWithCommandBuffer(
-                commandBuffer: commandBuffer, positionsBuffer: positionBuffer,
-                numBodies: numBodies, view: _view
+                commandBuffer: commandBuffer,
+                positionsBuffer: positionBuffer,
+                numBodies: numBodies
             )
 
             commandBuffer.commit()
@@ -307,7 +205,7 @@ class FoilViewController: NSViewController, MTKViewDelegate {
 
             simulationTime += Double(config.simInterval)
         } else {
-            renderer.drawProvidedPositionDataWithNumBodies(numParticles: numBodies, inView: _view)
+            renderer.drawProvidedPositionDataWithNumBodies(numParticles: numBodies)
         }
 
         var percentComplete = 0

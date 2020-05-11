@@ -8,8 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		D42B958B24648E2900F4B5B0 /* FoilShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = D42B958A24648E2900F4B5B0 /* FoilShaders.metal */; };
-		D462CC9D2466652400D79B48 /* LikeObjcSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D462CC9C2466652400D79B48 /* LikeObjcSync.swift */; };
-		D475693E2469259D000F87AE /* OFoilRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = D475693D2469259D000F87AE /* OFoilRenderer.m */; };
 		D4AC68B8245CF43F00917569 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AC68B7245CF43F00917569 /* AppDelegate.swift */; };
 		D4AC68BA245CF43F00917569 /* FoilViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AC68B9245CF43F00917569 /* FoilViewController.swift */; };
 		D4AC68BC245CF44000917569 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D4AC68BB245CF44000917569 /* Assets.xcassets */; };
@@ -23,9 +21,7 @@
 
 /* Begin PBXFileReference section */
 		D42B958A24648E2900F4B5B0 /* FoilShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = FoilShaders.metal; sourceTree = "<group>"; };
-		D462CC9C2466652400D79B48 /* LikeObjcSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikeObjcSync.swift; sourceTree = "<group>"; };
 		D475693C2469259D000F87AE /* Foil-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Foil-Bridging-Header.h"; sourceTree = "<group>"; };
-		D475693D2469259D000F87AE /* OFoilRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OFoilRenderer.m; sourceTree = "<group>"; };
 		D475693F24692638000F87AE /* FoilShaderTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FoilShaderTypes.h; sourceTree = "<group>"; };
 		D47569402469267E000F87AE /* FoilKernelTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FoilKernelTypes.h; sourceTree = "<group>"; };
 		D4AC68B4245CF43F00917569 /* Foil.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Foil.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,12 +75,10 @@
 				D4AC68BB245CF44000917569 /* Assets.xcassets */,
 				D4AC68B7245CF43F00917569 /* AppDelegate.swift */,
 				D4AC68C1245CF44000917569 /* Foil.entitlements */,
+				D475693C2469259D000F87AE /* Foil-Bridging-Header.h */,
 				D4AC68B9245CF43F00917569 /* FoilViewController.swift */,
 				D4AC68C0245CF44000917569 /* Info.plist */,
-				D462CC9C2466652400D79B48 /* LikeObjcSync.swift */,
 				D4AC68BD245CF44000917569 /* Main.storyboard */,
-				D475693D2469259D000F87AE /* OFoilRenderer.m */,
-				D475693C2469259D000F87AE /* Foil-Bridging-Header.h */,
 			);
 			path = Foil;
 			sourceTree = "<group>";
@@ -191,12 +185,10 @@
 			files = (
 				D4BE16FE2463F0E10085FD3C /* FoilKernels.metal in Sources */,
 				D4AC68C9245CF57A00917569 /* FoilRenderer.swift in Sources */,
-				D462CC9D2466652400D79B48 /* LikeObjcSync.swift in Sources */,
 				D4AC68BA245CF43F00917569 /* FoilViewController.swift in Sources */,
 				D42B958B24648E2900F4B5B0 /* FoilShaders.metal in Sources */,
 				D4F680AC245FACB3000B8EF2 /* FoilSimulation.swift in Sources */,
 				D4F680BE24639638000B8EF2 /* FoilMathUtilities.swift in Sources */,
-				D475693E2469259D000F87AE /* OFoilRenderer.m in Sources */,
 				D4AC68B8245CF43F00917569 /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

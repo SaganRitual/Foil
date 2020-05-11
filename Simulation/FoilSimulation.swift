@@ -1,7 +1,7 @@
 import Foundation
 import MetalKit
 
-let FoilNumUpdateBuffersStored = 1;
+let FoilNumUpdateBuffersStored = 1
 
 // Parameters to perform the N-Body simulation
 struct FoilSimulationConfig {
@@ -87,8 +87,8 @@ class FoilSimulation {
 
     // Initializer used to start a simulation already from the beginning
     init(computeDevice: MTLDevice, config: FoilSimulationConfig) {
-        self.device = computeDevice;
-        self.config = config;
+        self.device = computeDevice
+        self.config = config
         self.simulationTime = 0
         self.createMetalObjectsAndMemory()
         self.initializeData()
@@ -99,8 +99,8 @@ class FoilSimulation {
         computeDevice: MTLDevice, config: FoilSimulationConfig,
         positionData: NSData, velocityData: NSData, simulationTime: CFAbsoluteTime
     ) {
-        self.device = computeDevice;
-        self.config = config;
+        self.device = computeDevice
+        self.config = config
         self.simulationTime = simulationTime
 
         self.createMetalObjectsAndMemory()
@@ -112,14 +112,12 @@ class FoilSimulation {
 
     // Execute simulation on another thread, providing updates and final results with supplied blocks
     func runAsyncWithUpdateHandler(
-        updateHandler: @escaping FoilDataUpdateHandler, dataProvider: @escaping FoilFullDatasetProvider
+        updateHandler: @escaping FoilDataUpdateHandler
     ) {
         simulationDispatchQueue.async {
             self.commandQueue = self.device.makeCommandQueue()
 
             self.runAsyncLoopWithUpdateHandler(updateHandler: updateHandler)
-
-            self.provideFullData(dataProvider: dataProvider, forSimulationTime: self.simulationTime)
         }
     }
 
@@ -130,7 +128,7 @@ class FoilSimulation {
         guard let computeEncoder = commandBuffer.makeComputeCommandEncoder()
             else { fatalError() }
 
-        computeEncoder.label = "Compute Encoder";
+        computeEncoder.label = "Compute Encoder"
 
         computeEncoder.setComputePipelineState(computePipeline)
 
@@ -146,9 +144,9 @@ class FoilSimulation {
 
         // Swap indices to use data generated this frame at newBufferIndex to generate data for the
         // next frame and write it to the buffer at oldBufferIndex
-        let tmpIndex = oldBufferIndex;
-        oldBufferIndex = newBufferIndex;
-        newBufferIndex = tmpIndex;
+        let tmpIndex = oldBufferIndex
+        oldBufferIndex = newBufferIndex
+        newBufferIndex = tmpIndex
 
         commandBuffer.popDebugGroup()
 
@@ -164,14 +162,14 @@ class FoilSimulation {
         guard let defaultLibrary = device.makeDefaultLibrary(),
               let nbodySimulation = defaultLibrary.makeFunction(name: "NBodySimulation"),
               let cp = try? device.makeComputePipelineState(function: nbodySimulation) else {
-            fatalError("Failed to create compute pipeline state");
+            fatalError("Failed to create compute pipeline state")
         }
 
         computePipeline = cp
 
         // Calculate parameters to efficiently execute the simulation kernel
-        threadsPerThreadgroup = MTLSizeMake(computePipeline.threadExecutionWidth, 1, 1);
-        dispatchExecutionSize =  MTLSizeMake(config.numBodies, 1, 1);
+        threadsPerThreadgroup = MTLSizeMake(computePipeline.threadExecutionWidth, 1, 1)
+        dispatchExecutionSize =  MTLSizeMake(config.numBodies, 1, 1)
         threadgroupMemoryLength = computePipeline.threadExecutionWidth * MemoryLayout<vector_float4>.stride
 
         // Create buffers to hold our simulation data and generate initial data set
@@ -193,7 +191,7 @@ class FoilSimulation {
         guard let sp = device.makeBuffer(length: length, options: .storageModeManaged)
             else { fatalError() }
 
-        sp.label = "Simulation Params";
+        sp.label = "Simulation Params"
         simulationParams = sp
 
         let c_ = UnsafeMutableRawPointer(mutating: sp.contents())
@@ -271,21 +269,21 @@ class FoilSimulation {
             p.w = 1
 
             var axis = vector_float3(0.0, 0.0, 1.0)
-            let scalar = simd_dot(nrpos, axis);
+            let scalar = simd_dot(nrpos, axis)
 
             if((1 - scalar) < 1e-6) {
                 axis.x = nrpos.y
                 axis.y = nrpos.x
 
-                axis = simd_normalize(axis);
+                axis = simd_normalize(axis)
             }
 
-            let velocity = simd_cross(position, axis);
+            let velocity = simd_cross(position, axis)
 
             var v = velocities[i]
-            v.x = velocity.x * vscale;
-            v.y = velocity.y * vscale;
-            v.z = velocity.z * vscale;
+            v.x = velocity.x * vscale
+            v.y = velocity.y * vscale
+            v.z = velocity.z * vscale
         }
 
         let fullPRange = 0..<self.positions[oldBufferIndex].length
@@ -299,17 +297,17 @@ class FoilSimulation {
     func setPositionData(
         positionData: NSData, velocityData: NSData, forSimulationTime: CFAbsoluteTime
     ) {
-        oldBufferIndex = 0;
-        newBufferIndex = 1;
+        oldBufferIndex = 0
+        newBufferIndex = 1
 
         let positions = self.positions[oldBufferIndex].contents()
         let velocities = self.velocities[oldBufferIndex].contents()
 
-        assert(self.positions[oldBufferIndex].length == positionData.length);
-        assert(self.velocities[oldBufferIndex].length == velocityData.length);
+        assert(self.positions[oldBufferIndex].length == positionData.length)
+        assert(self.velocities[oldBufferIndex].length == velocityData.length)
 
-        memcpy(positions, positionData.bytes, positionData.length);
-        memcpy(velocities, velocityData.bytes, velocityData.length);
+        memcpy(positions, positionData.bytes, positionData.length)
+        memcpy(velocities, velocityData.bytes, velocityData.length)
 
         let fullPRange = 0..<self.positions[oldBufferIndex].length
         self.positions[oldBufferIndex].didModifyRange(fullPRange)
@@ -317,7 +315,7 @@ class FoilSimulation {
         let fullVRange = 0..<self.velocities[oldBufferIndex].length
         self.velocities[oldBufferIndex].didModifyRange(fullVRange)
 
-        self.simulationTime = forSimulationTime;
+        self.simulationTime = forSimulationTime
     }
 
     /// Blit a subset of the positions data for this frame and provide them to the client
@@ -327,7 +325,7 @@ class FoilSimulation {
     ) {
         guard let blitEncoder = commandBuffer.makeBlitCommandEncoder() else { fatalError() }
 
-        blitEncoder.label = "Position Update Blit Encoder";
+        blitEncoder.label = "Position Update Blit Encoder"
         blitEncoder.pushDebugGroup("Position Update Blit Commands")
 
         blitEncoder.copy(
@@ -384,13 +382,9 @@ class FoilSimulation {
         blitEncoder.endEncoding()
 
         commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
 
-        dataProvider(positionsData, velocitiesData, time);
+        dataProvider(positionsData, velocitiesData, time)
     }
-
-    /// Run a frame of the simulation with the given command buffer (used both when simulation is run
-    /// synchronously or asynchronously)
 
     /// Run the asynchronous simulation loop
     func runAsyncLoopWithUpdateHandler(updateHandler: @escaping FoilDataUpdateHandler) {

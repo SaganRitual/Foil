@@ -183,11 +183,12 @@ class FoilSimulation {
 
         let c_ = UnsafeMutableRawPointer(mutating: sp.contents())
 
-        var c = c_.assumingMemoryBound(to: FoilSimParams.self).pointee
-        c.timestep = config.simInterval
-        c.damping = config.damping
-        c.softeningSqr = config.softeningSqr
-        c.numBodies = UInt32(config.numBodies)
+        let c = FoilSimParams(timestep: config.simInterval,
+                              damping: config.damping,
+                              softeningSqr: config.softeningSqr,
+                              numBodies: UInt32(config.numBodies))
+
+        c_.assumingMemoryBound(to: FoilSimParams.self).pointee = c
 
         simulationParams.didModifyRange(0..<sp.length)
 
@@ -252,8 +253,11 @@ class FoilSimulation {
             let position = nrpos * (inner + (length * rpos))
 
             var p = positions[i]
-            p.x = position.x; p.y = position.x; p.z = position.z
+
+            p.x = position.x; p.y = position.y; p.z = position.z
             p.w = 1
+
+            positions[i] = p
 
             var axis = vector_float3(0.0, 0.0, 1.0)
             let scalar = simd_dot(nrpos, axis)
@@ -271,6 +275,8 @@ class FoilSimulation {
             v.x = velocity.x * vscale
             v.y = velocity.y * vscale
             v.z = velocity.z * vscale
+
+            velocities[i] = v
         }
 
         let fullPRange = 0..<self.positions[oldBufferIndex].length

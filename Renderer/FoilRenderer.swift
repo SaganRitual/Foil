@@ -59,11 +59,7 @@ class FoilRenderer: NSObject, MTKViewDelegate {
         updateProjectionMatrix()
     }
 
-    /// Update the projection matrix with a new drawable size
-    func drawableSizeWillChange(size: CGSize) {
-        print("dswc(CGSize)")
-        updateProjectionMatrix()
-    }
+    func drawableSizeWillChange() { updateProjectionMatrix() }
 
     /// Draw particles at the supplied positions using the given command buffer to the given view
     func draw(
@@ -201,7 +197,7 @@ class FoilRenderer: NSObject, MTKViewDelegate {
         pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
         pipelineDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
         pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperation.add
-        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor  = MTLBlendFactor.sourceAlpha
+        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactor.sourceAlpha
         pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactor.sourceAlpha
 
         guard let rp = try? device.makeRenderPipelineState(descriptor: pipelineDescriptor)
@@ -229,10 +225,12 @@ class FoilRenderer: NSObject, MTKViewDelegate {
     /// Update any render state (including updating dynamically changing Metal buffers)
     func updateState() {
         let uniforms = dynamicUniformBuffer.contents()
-        var u = uniforms.assumingMemoryBound(to: FoilUniforms.self).pointee
 
-        u.pointSize = FoilRenderer.bodyPointSize
-        u.mvpMatrix = projectionMatrix
+        let u = FoilUniforms(
+            mvpMatrix: projectionMatrix, pointSize: FoilRenderer.bodyPointSize
+        )
+
+        uniforms.assumingMemoryBound(to: FoilUniforms.self).pointee = u
     }
 
     func providePositionData(data: NSData) {
@@ -289,16 +287,23 @@ class FoilRenderer: NSObject, MTKViewDelegate {
     func updateProjectionMatrix() {
         // React to resize of the draw rect.  In particular update the perspective matrix.
         // Update the aspect ratio and projection matrix since the view orientation or size has changed
-        let aspect: Float = Float(view.drawableSize.height) / Float(view.drawableSize.width)
-        let left: Float   = renderScale
-        let right: Float  = -renderScale
-        let bottom: Float = renderScale * aspect
-        let top: Float    = -renderScale * aspect
-        let near: Float   = 5000
-        let far: Float    = -5000
+//        let aspect: Float = Float(view.drawableSize.height) / Float(view.drawableSize.width)
+//        let left: Float   = renderScale
+//        let right: Float  = -renderScale
+//        let bottom: Float = renderScale * aspect
+//        let top: Float    = -renderScale * aspect
+//        let near: Float   = 5000
+//        let far: Float    = -5000
+//
+//        projectionMatrix = FoilMath.matrixOrthoLeftHand(
+//            left: left, right: right, bottom: bottom, top: top, nearZ: near, farZ: far
+//        )
 
-        projectionMatrix = FoilMath.matrixOrthoLeftHand(
-            left: left, right: right, bottom: bottom, top: top, nearZ: near, farZ: far
+        projectionMatrix = FoilMath.matriMakeRows(
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
         )
     }
 }

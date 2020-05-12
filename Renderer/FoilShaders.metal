@@ -35,7 +35,7 @@ vertex ColorInOut vertexShader(uint                    vertexID  [[ vertex_id ]]
     out.color = half4(color[vertexID]) / 255.0h;
 
     out.pointSize = half(uniforms.pointSize);
-
+    assert(false);
     return out;
 }
 

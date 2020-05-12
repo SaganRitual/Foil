@@ -52,7 +52,7 @@ class FoilViewController: NSViewController {
 
     // Command queue used when simulation and renderer are using the same device.
     // Set to nil when using different devices
-    var commandQueue: MTLCommandQueue!
+    var viewControllerCommandQueue: MTLCommandQueue!
 
     // When true, stop running any more simulations (such as when the window closes).
     var terminateAllSimulations = false
@@ -111,6 +111,8 @@ class FoilViewController: NSViewController {
         renderer = FoilRenderer(self, rendererDevice)
 
         NSLog("New render device: \"\(rendererDevice.name)\"")
+
+        renderer.drawableSizeWillChange()
     }
 
     func beginSimulation() {
@@ -123,7 +125,7 @@ class FoilViewController: NSViewController {
 
         renderer.setRenderScale(renderScale: config.renderScale)
 
-        commandQueue = renderer.device.makeCommandQueue()
+        viewControllerCommandQueue = renderer.device.makeCommandQueue()
 
         NSLog("Starting Simulation Config: \(configNum)")
     }
@@ -184,8 +186,8 @@ class FoilViewController: NSViewController {
 
         // If the simulation and device are using the same device _commandQueue will be set
         // Create a command buffer to both execute a simulation frame and render an update
-        guard let commandQueue = self.commandQueue,
-              let simulate_render_commandBuffer = commandQueue.makeCommandBuffer()
+        guard let vcCommandQueue = self.viewControllerCommandQueue,
+              let simulate_render_commandBuffer = vcCommandQueue.makeCommandBuffer()
             else { fatalError() }
 
         simulate_render_commandBuffer.label = "simulate_render_commandBuffer"

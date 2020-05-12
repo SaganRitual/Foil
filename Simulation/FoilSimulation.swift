@@ -110,22 +110,11 @@ class FoilSimulation {
         )
     }
 
-    // Execute simulation on another thread, providing updates and final results with supplied blocks
-    func runAsyncWithUpdateHandler(
-        updateHandler: @escaping FoilDataUpdateHandler
-    ) {
-        simulationDispatchQueue.async {
-            self.commandQueue = self.device.makeCommandQueue()
-
-            self.runAsyncLoopWithUpdateHandler(updateHandler: updateHandler)
-        }
-    }
-
     // Execute a single frame of the simulation (on the current thread)
-    func simulateFrame(commandBuffer: MTLCommandBuffer) -> MTLBuffer {
-        commandBuffer.pushDebugGroup("Simulation")
+    func simulateFrame(_ simulateFrameCommandBuffer: MTLCommandBuffer) -> MTLBuffer {
+        simulateFrameCommandBuffer.label = "Simulation"
 
-        guard let computeEncoder = commandBuffer.makeComputeCommandEncoder()
+        guard let computeEncoder = simulateFrameCommandBuffer.makeComputeCommandEncoder()
             else { fatalError() }
 
         computeEncoder.label = "Compute Encoder"
@@ -147,8 +136,6 @@ class FoilSimulation {
         let tmpIndex = oldBufferIndex
         oldBufferIndex = newBufferIndex
         newBufferIndex = tmpIndex
-
-        commandBuffer.popDebugGroup()
 
         self.simulationTime += Double(config.simInterval)
 
@@ -321,9 +308,9 @@ class FoilSimulation {
     /// Blit a subset of the positions data for this frame and provide them to the client
     /// to show a summary of the simulation's progress
     func fillUpdateBufferWithPositionBuffer(
-        buffer: MTLBuffer, usingCommandBuffer commandBuffer: MTLCommandBuffer
+        buffer: MTLBuffer, blitCommandBuffer: MTLCommandBuffer
     ) {
-        guard let blitEncoder = commandBuffer.makeBlitCommandEncoder() else { fatalError() }
+        guard let blitEncoder = blitCommandBuffer.makeBlitCommandEncoder() else { fatalError() }
 
         blitEncoder.label = "Position Update Blit Encoder"
         blitEncoder.pushDebugGroup("Position Update Blit Commands")
@@ -360,10 +347,10 @@ class FoilSimulation {
     func provideFullData(
         dataProvider: FoilFullDatasetProvider, forSimulationTime time: CFAbsoluteTime
     ) {
-        guard let commandBuffer = commandQueue.makeCommandBuffer() else { fatalError() }
-        commandBuffer.label = "Full Transfer Command Buffer"
+        guard let blitCommandBuffer = commandQueue.makeCommandBuffer() else { fatalError() }
+        blitCommandBuffer.label = "blitCommandBuffer"
 
-        guard let blitEncoder = commandBuffer.makeBlitCommandEncoder() else { fatalError() }
+        guard let blitEncoder = blitCommandBuffer.makeBlitCommandEncoder() else { fatalError() }
         blitEncoder.label = "Full Transfer Blits"
 
         let (positionsBuffer, positionsData) = makeBufferForRenderBodiesVectors(
@@ -381,42 +368,8 @@ class FoilSimulation {
 
         blitEncoder.endEncoding()
 
-        commandBuffer.commit()
+        blitCommandBuffer.commit()
 
         dataProvider(positionsData, velocitiesData, time)
-    }
-
-    /// Run the asynchronous simulation loop
-    func runAsyncLoopWithUpdateHandler(updateHandler: @escaping FoilDataUpdateHandler) {
-        var loopCounter = 0
-
-        repeat {
-            defer { loopCounter += 1 }
-
-            guard let commandBuffer = commandQueue.makeCommandBuffer() else
-                { fatalError() }
-
-            let positionBuffer = simulateFrame(commandBuffer: commandBuffer)
-
-            fillUpdateBufferWithPositionBuffer(
-                buffer: positionBuffer, usingCommandBuffer: commandBuffer
-            )
-
-            // Pass data back to client to update it with a summary of progress
-            guard let updateSimulationTime = simulationTime else { fatalError() }
-
-            addCommandCompletionHandler(commandBuffer, loopCounter) {
-                updateHandler(self.updateData, updateSimulationTime)
-            }
-
-            commandBuffer.commit()
-
-        } while(simulationTime < config.simDuration && !halt)
-    }
-
-    func addCommandCompletionHandler(
-        _ commandBuffer: MTLCommandBuffer, _ loopCounter: Int, _ updateHandler: @escaping () -> Void
-    ) {
-        commandBuffer.addCompletedHandler { _ in updateHandler() }
     }
 }

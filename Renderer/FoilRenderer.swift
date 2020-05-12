@@ -25,15 +25,12 @@ class FoilRenderer: NSObject, MTKViewDelegate {
 
     // Metal objects
     var depthState: MTLDepthStencilState!
-    var dynamicUniformBuffers = [MTLBuffer]()
+    var dynamicUniformBuffer: MTLBuffer!
     var positionsBuffer: MTLBuffer!
     var renderPipeline: MTLRenderPipelineState!
 
     let view: MTKView
     let viewController: FoilViewController
-
-    // Current buffer to fill with dynamic uniform data and set for the current frame
-    var currentBufferIndex = 0
 
     // Projection matrix calculated as a function of view size
     var projectionMatrix = matrix_float4x4()
@@ -69,12 +66,12 @@ class FoilRenderer: NSObject, MTKViewDelegate {
     }
 
     /// Draw particles at the supplied positions using the given command buffer to the given view
-    func drawWithCommandBuffer(
-        commandBuffer: MTLCommandBuffer,
+    func draw(
+        _ drawCommandBuffer: MTLCommandBuffer,
         positionsBuffer: MTLBuffer,
         numBodies: Int
     ) {
-        commandBuffer.pushDebugGroup("Draw Simulation Data")
+        drawCommandBuffer.label = "Draw Simulation Data"
 
         setNumRenderBodies(numBodies)
         updateState()
@@ -83,7 +80,7 @@ class FoilRenderer: NSObject, MTKViewDelegate {
         // If a renderPassDescriptor has been obtained, render to the drawable, otherwise skip
         // any rendering this frame because there is no drawable to draw to
         guard let renderPassDescriptor = view.currentRenderPassDescriptor,
-              let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
+              let renderEncoder = drawCommandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
             else { fatalError() }
 
         renderEncoder.label = "Render Commands"
@@ -104,7 +101,7 @@ class FoilRenderer: NSObject, MTKViewDelegate {
         )
 
         renderEncoder.setVertexBuffer(
-            dynamicUniformBuffers[currentBufferIndex],
+            dynamicUniformBuffer,
             offset: 0, index: Int(FoilRenderBufferIndexUniforms.rawValue)
         )
 
@@ -118,9 +115,7 @@ class FoilRenderer: NSObject, MTKViewDelegate {
         )
 
         renderEncoder.endEncoding()
-        commandBuffer.present(view.currentDrawable!)
-
-        commandBuffer.popDebugGroup()
+        drawCommandBuffer.present(view.currentDrawable!)
     }
 
     /// Generates a texture to make rounded points for particles
@@ -226,14 +221,14 @@ class FoilRenderer: NSObject, MTKViewDelegate {
             else { fatalError() }
 
         dub.label = "UniformBuffer"
-        dynamicUniformBuffers.append(dub)
+        self.dynamicUniformBuffer = dub
 
         commandQueue = device.makeCommandQueue()
     }
 
     /// Update any render state (including updating dynamically changing Metal buffers)
     func updateState() {
-        let uniforms = dynamicUniformBuffers[currentBufferIndex].contents()
+        let uniforms = dynamicUniformBuffer.contents()
         var u = uniforms.assumingMemoryBound(to: FoilUniforms.self).pointee
 
         u.pointSize = FoilRenderer.bodyPointSize
@@ -284,21 +279,6 @@ class FoilRenderer: NSObject, MTKViewDelegate {
 
             colorsBuffer!.didModifyRange(0..<bufferSize)
         }
-    }
-
-    func drawProvidedPositionDataWithNumBodies(numParticles: Int) {
-        // Create a new command buffer for each render pass to the current drawable
-        guard let commandBuffer = commandQueue.makeCommandBuffer() else { fatalError() }
-        commandBuffer.label = "Render Command Buffer"
-
-        drawWithCommandBuffer(
-            commandBuffer: commandBuffer,
-            positionsBuffer: positionsBuffer,
-            numBodies: numParticles
-        )
-
-        // Finalize rendering here & push the command buffer to the GPU
-        commandBuffer.commit()
     }
 
     func setRenderScale(renderScale: Float) {

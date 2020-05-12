@@ -184,29 +184,26 @@ class FoilViewController: NSViewController {
 
         // If the simulation and device are using the same device _commandQueue will be set
         // Create a command buffer to both execute a simulation frame and render an update
-        if let commandQueue = self.commandQueue,
-           let commandBuffer = commandQueue.makeCommandBuffer() {
-            commandBuffer.pushDebugGroup("Controller Frame")
+        guard let commandQueue = self.commandQueue,
+              let simulate_render_commandBuffer = commandQueue.makeCommandBuffer()
+            else { fatalError() }
 
-            // Simulate the frame and obtain the new positions for the update.  If this is the final
-            // frame positionBuffer will be filled with the all positions used for the simulation
-            let positionBuffer = simulation.simulateFrame(commandBuffer: commandBuffer)
+        simulate_render_commandBuffer.label = "simulate_render_commandBuffer"
 
-            // Render the updated positions (or all positions in the case that the simulation is complete)
-            renderer.drawWithCommandBuffer(
-                commandBuffer: commandBuffer,
-                positionsBuffer: positionBuffer,
-                numBodies: numBodies
-            )
+        // Simulate the frame and obtain the new positions for the update.  If this is the final
+        // frame positionBuffer will be filled with the all positions used for the simulation
+        let positionsBuffer = simulation.simulateFrame(simulate_render_commandBuffer)
 
-            commandBuffer.commit()
+        // Render the updated positions (or all positions in the case that the simulation is complete)
+        renderer.draw(
+            simulate_render_commandBuffer,
+            positionsBuffer: positionsBuffer,
+            numBodies: numBodies
+        )
 
-            commandBuffer.popDebugGroup()
+        simulate_render_commandBuffer.commit()
 
-            simulationTime += Double(config.simInterval)
-        } else {
-            renderer.drawProvidedPositionDataWithNumBodies(numParticles: numBodies)
-        }
+        simulationTime += Double(config.simInterval)
 
         var percentComplete = 0
 

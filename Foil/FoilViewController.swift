@@ -21,16 +21,22 @@ class FoilViewController: NSViewController {
     // such as these from a file or UI controls, but to simplify the sample and focus on Metal usage,
     // this table is hardcoded
     static let FoilSimulationConfigTable = [
+        FoilSimulationConfig(damping: 0.9589766, softeningSqr: 0.3, numBodies: 8192, clusterScale: 0.42543644, velocityScale: 1.2444435, renderScale: 7.6108184, renderBodies: 8192, simInterval: 0.016666668, simDuration: 5.0),
+        FoilSimulationConfig(damping: 0.9589766, softeningSqr: 0.2, numBodies: 8192, clusterScale: 0.42543644, velocityScale: 1.2444435, renderScale: 7.6108184, renderBodies: 8192, simInterval: 0.016666668, simDuration: 5.0),
+        FoilSimulationConfig(damping: 0.9589766, softeningSqr: 0.1, numBodies: 8192, clusterScale: 0.42543644, velocityScale: 1.2444435, renderScale: 7.6108184, renderBodies: 8192, simInterval: 0.016666668, simDuration: 5.0),
         // damping softening numBodies clusterScale velocityScale renderScale renderBodies simInterval simDuration
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 4096, clusterScale: 0.32, velocityScale: metersPerSecond / 30, renderScale:    2.5, renderBodies: 4096, simInterval: frameTime / 30, simDuration: 10.0 * second / 30),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 4096, clusterScale: 6.04, velocityScale:                    0, renderScale:   75.0, renderBodies: 4096, simInterval: frameTime,      simDuration: 10.0 * second),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.145, numBodies: 4096, clusterScale: 0.32, velocityScale: metersPerSecond / 30, renderScale:    2.5, renderBodies: 4096, simInterval: frameTime / 30, simDuration: 10.0 * second / 30),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 4096, clusterScale: 1.54, velocityScale: metersPerSecond / 30, renderScale:   75.0, renderBodies: 4096, simInterval: frameTime,      simDuration: 10.0 * second),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.100, numBodies: 4096, clusterScale: 0.68, velocityScale: metersPerSecond / 30, renderScale: 1000.0, renderBodies: 4096, simInterval: frameTime,      simDuration: 10.0 * second),
-        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 4096, clusterScale: 1.54, velocityScale: metersPerSecond / 30, renderScale:   75.0, renderBodies: 4096, simInterval: frameTime,      simDuration: 10.0 * second)
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.500, numBodies: 8192, clusterScale: 0.70, velocityScale:                  1.0, renderScale:  100.0, renderBodies: 8192, simInterval: frameTime,      simDuration: 10.0 * second),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.100, numBodies: 16384, clusterScale: 0.50, velocityScale: metersPerSecond / 30, renderScale:   25.0, renderBodies: 16384, simInterval: frameTime,      simDuration: 10.0 * second),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 16384, clusterScale: 0.32, velocityScale: metersPerSecond / 30, renderScale:    2.5, renderBodies: 16384, simInterval: frameTime / 30, simDuration: 10.0 * second / 30),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.000, numBodies: 16384, clusterScale: 6.04, velocityScale:                    0, renderScale:   75.0, renderBodies: 16384, simInterval: frameTime,      simDuration: 10.0 * second),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.145, numBodies: 16384, clusterScale: 0.32, velocityScale: metersPerSecond / 30, renderScale:    2.5, renderBodies: 16384, simInterval: frameTime / 30, simDuration: 10.0 * second / 30),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 0.145, numBodies: 16384, clusterScale: 0.32, velocityScale: 20.0, renderScale: 2.5, renderBodies: 16384, simInterval: 0.00055555557, simDuration: 0.3333333333333333),
+        FoilSimulationConfig(damping: 1.0, softeningSqr: 1.0, numBodies: 16384, clusterScale: 0.32, velocityScale: 20.0, renderScale: 2.5, renderBodies: 16384, simInterval: 0.00055555557, simDuration: 0.0004),
+        FoilSimulationConfig(damping: 0.9589766, softeningSqr: 0.3, numBodies: 8192, clusterScale: 0.42543644, velocityScale: 1.2444435, renderScale: 7.6108184, renderBodies: 8192, simInterval: 0.016666668, simDuration: 5.0)
     ]
 
     static let FoilNumSimulationConfigs = FoilSimulationConfigTable.count
+    static let FoilSecondsToPresentSimulationResults = CFTimeInterval(0.5)
 
     var renderer: FoilRenderer!
     var simulation: FoilSimulation!
@@ -103,34 +109,63 @@ class FoilViewController: NSViewController {
         precondition(!availableDevices.isEmpty, "Metal is not supported on this Mac")
 
         computeDevice = availableDevices[RadeonGPUInMetalDevicesArray]
-        NSLog("Selected compute device: \(computeDevice.name)")
 
         // Select renderer device
         let rendererDevice = availableDevices[RadeonGPUInMetalDevicesArray]
 
         renderer = FoilRenderer(self, rendererDevice)
 
-        NSLog("New render device: \"\(rendererDevice.name)\"")
-
         renderer.drawableSizeWillChange()
     }
+
+    static var experimentalValue = Float(0.01)
 
     func beginSimulation() {
         simulationTime = 0
 
         _simulationName.stringValue = "Simulation \(configNum)"
-        config = FoilViewController.FoilSimulationConfigTable[configNum]
+        let c = FoilViewController.FoilSimulationConfigTable[configNum]
+
+//        c.simDuration = 4
+//        c.damping = Float.random(in: 0.7..<1.06) // FoilViewController.experimentalValue
+//        c.softeningSqr = Float.random(in: 0.01..<0.04)// FoilViewController.experimentalValue
+//        c.clusterScale = Float.random(in: 0.01..<0.5)
+//        c.renderScale = Float.random(in: 2.5..<100)
+//        c.velocityScale = Float.random(in: 1..<2)
+        config = c
+        print("F: ", config!)
+
+        FoilViewController.experimentalValue *= 1.1
+
+//        let softeningSqr = Double.random(in: 0.1..<1.0)
+//        let numBodies = 4096
+//        let clusterScale = Double.random(in: 0.2..<6.0)
+//        let velocityScale = Double.random(in: 0..<3.0)
+//        let renderScale = Double.random(in: 2.5..<200)
+//        let renderBodies = 4096
+//        let simInterval = FoilViewController.frameTime
+//        let simDuration = 3.0 * FoilViewController.second
+//
+//        config = FoilSimulationConfig(
+//            damping: 1.0,
+//            softeningSqr: softeningSqr,
+//            numBodies: numBodies,
+//            clusterScale: clusterScale,
+//            velocityScale: velocityScale,
+//            renderScale: renderScale,
+//            renderBodies: renderBodies,
+//            simInterval: simInterval,
+//            simDuration: simDuration
+//        )
+
+//        print("config", config!)
 
         simulation = FoilSimulation(computeDevice: computeDevice, config: config)
 
         renderer.setRenderScale(renderScale: config.renderScale)
 
         viewControllerCommandQueue = renderer.device.makeCommandQueue()
-
-        NSLog("Starting Simulation Config: \(configNum)")
     }
-
-    static let FoilSecondsToPresentSimulationResults = CFTimeInterval(4.0)
 
     /// Called whenever the view needs to render
     func draw(in view: MTKView) {

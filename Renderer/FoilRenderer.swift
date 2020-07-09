@@ -287,23 +287,16 @@ class FoilRenderer: NSObject, MTKViewDelegate {
     func updateProjectionMatrix() {
         // React to resize of the draw rect.  In particular update the perspective matrix.
         // Update the aspect ratio and projection matrix since the view orientation or size has changed
-//        let aspect: Float = Float(view.drawableSize.height) / Float(view.drawableSize.width)
-//        let left: Float   = renderScale
-//        let right: Float  = -renderScale
-//        let bottom: Float = renderScale * aspect
-//        let top: Float    = -renderScale * aspect
-//        let near: Float   = 5000
-//        let far: Float    = -5000
-//
-//        projectionMatrix = FoilMath.matrixOrthoLeftHand(
-//            left: left, right: right, bottom: bottom, top: top, nearZ: near, farZ: far
-//        )
+        let aspect: Float = Float(view.drawableSize.height) / Float(view.drawableSize.width)
+        let left: Float   = renderScale
+        let right: Float  = -renderScale
+        let bottom: Float = renderScale * aspect
+        let top: Float    = -renderScale * aspect
+        let near: Float   = 5000
+        let far: Float    = -5000
 
-        projectionMatrix = FoilMath.matriMakeRows(
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
+        projectionMatrix = FoilMath.matrixOrthoLeftHand(
+            left: left, right: right, bottom: bottom, top: top, nearZ: near, farZ: far
         )
     }
 }

@@ -22,15 +22,39 @@ struct FoilSimulationConfig {
         self.simDuration = simDuration
     }
 
-    let damping: Float;             // Factor for reducing simulation instability
-    let softeningSqr: Float;        // Factor for simulating collisions
-    let numBodies: Int              // Number of bodies in the simulations
-    let clusterScale: Float;        // Factor for grouping the initial set of bodies
-    let velocityScale: Float;       // Scaling of  each body's speed
-    let renderScale: Float;         // The scale of the viewport to render the results
-    let renderBodies: Int;          // Number of bodies to transfer and render for an intermediate update
-    let simInterval: Float;         // The "time" (in "simulation time" units) of each frame of the simulation
-    let simDuration: CFAbsoluteTime // The "duration" (in "simulation time" units) for the simulation
+    init(_ config: FoilSimulationConfig) {
+        self.damping = config.damping
+        self.softeningSqr = config.softeningSqr
+        self.numBodies = config.numBodies
+        self.clusterScale = config.clusterScale
+        self.velocityScale = config.velocityScale
+        self.renderScale = config.renderScale
+        self.renderBodies = config.renderBodies
+        self.simInterval = config.simInterval
+        self.simDuration = config.simDuration
+    }
+
+    enum Field: CaseIterable { case damping, softeningSqr, clusterScale, velocityScale, renderScale }
+
+    mutating func randomize() {
+        switch Field.allCases.randomElement()! {
+        case .damping: damping = Float.random(in: 0.5..<1)
+        case .softeningSqr: softeningSqr = Float.random(in: 0..<0.5)
+        case .clusterScale: clusterScale = Float.random(in: 0.01..<0.3)
+        case .velocityScale: velocityScale = Float.random(in: 20..<30)
+        case .renderScale: renderScale = Float.random(in: 2.5..<250)
+        }
+    }
+
+    var damping: Float;             // Factor for reducing simulation instability
+    var softeningSqr: Float;        // Factor for simulating collisions
+    var numBodies: Int              // Number of bodies in the simulations
+    var clusterScale: Float;        // Factor for grouping the initial set of bodies
+    var velocityScale: Float;       // Scaling of  each body's speed
+    var renderScale: Float;         // The scale of the viewport to render the results
+    var renderBodies: Int;          // Number of bodies to transfer and render for an intermediate update
+    var simInterval: Float;         // The "time" (in "simulation time" units) of each frame of the simulation
+    var simDuration: CFAbsoluteTime // The "duration" (in "simulation time" units) for the simulation
 }
 
 class FoilSimulation {

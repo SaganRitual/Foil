@@ -22,6 +22,49 @@ static float3 computeAcceleration(const float4 vsPosition,
     return r * s;
 }
 
+static float3 computeAccelerations(const uint numThreadsInGroup,
+                                   const float3 startingAcceleration,
+                                   threadgroup float4* sharedPosition,
+                                   const float4 currentPosition,
+                                   const float softeningSqr)
+{
+    float3 acceleration = startingAcceleration;
+
+    for(uint i = 0; i < numThreadsInGroup; i++)
+    {
+        acceleration += computeAcceleration(sharedPosition[i], currentPosition, softeningSqr);
+    }
+
+    return acceleration;
+}
+
+static float3 computeForBody(device float4* oldPosition,
+                             const uint numThreadsInGroup,
+                             const uint threadInGroup,
+                             const uint threadInGrid,
+                             const uint numBodies,
+                             threadgroup float4* sharedPosition,
+                             const float softeningSqr)
+{
+    float4 currentPosition = oldPosition[threadInGrid];
+    float3 acceleration = 0.0f;
+    uint sourcePosition = threadInGroup;
+
+    // For each particle / body
+    for(uint i = 0; i < numBodies; i += numThreadsInGroup)
+    {
+        // Because sharedPosition uses the threadgroup address space, 'numThreadsInGroup' elements
+        // of sharedPosition will be initialized at once (not just one element at lid as it
+        // may look like)
+        sharedPosition[threadInGroup] = oldPosition[sourcePosition];
+
+        acceleration = computeAccelerations(numThreadsInGroup, acceleration, sharedPosition, currentPosition, softeningSqr);
+        sourcePosition += numThreadsInGroup;
+    }
+
+    return acceleration;
+}
+
 kernel void NBodySimulation(device float4*           newPosition       [[ buffer(FoilComputeBufferIndexNewPosition) ]],
                             device float4*           newVelocity       [[ buffer(FoilComputeBufferIndexNewVelocity) ]],
                             device float4*           oldPosition       [[ buffer(FoilComputeBufferIndexOldPosition) ]],
@@ -32,44 +75,16 @@ kernel void NBodySimulation(device float4*           newPosition       [[ buffer
                             const uint               threadInGroup     [[ thread_position_in_threadgroup            ]],
                             const uint               numThreadsInGroup [[ threads_per_threadgroup                   ]])
 {
-
-    float4 currentPosition = oldPosition[threadInGrid];
-    float3 acceleration = 0.0f;
-    uint i, j;
-
-    const float softeningSqr = params.softeningSqr;
-
-    uint sourcePosition = threadInGroup;
-
-    // For each particle / body
-    for(i = 0; i < params.numBodies; i += numThreadsInGroup)
-    {
-        // Because sharedPosition uses the threadgroup address space, 'numThreadsInGroup' elements
-        // of sharedPosition will be initialized at once (not just one element at lid as it
-        // may look like)
-        sharedPosition[threadInGroup] = oldPosition[sourcePosition];
-
-        j = 0;
-
-        while(j < numThreadsInGroup)
-        {
-            acceleration += computeAcceleration(sharedPosition[j++], currentPosition, softeningSqr);
-            acceleration += computeAcceleration(sharedPosition[j++], currentPosition, softeningSqr);
-            acceleration += computeAcceleration(sharedPosition[j++], currentPosition, softeningSqr);
-            acceleration += computeAcceleration(sharedPosition[j++], currentPosition, softeningSqr);
-            acceleration += computeAcceleration(sharedPosition[j++], currentPosition, softeningSqr);
-            acceleration += computeAcceleration(sharedPosition[j++], currentPosition, softeningSqr);
-            acceleration += computeAcceleration(sharedPosition[j++], currentPosition, softeningSqr);
-            acceleration += computeAcceleration(sharedPosition[j++], currentPosition, softeningSqr);
-        } // while
-
-        sourcePosition += numThreadsInGroup;
-    } // for
+    float3 const acceleration = computeForBody(
+        oldPosition, numThreadsInGroup, threadInGroup, threadInGrid,
+        params.numBodies, sharedPosition, params.softeningSqr
+    );
 
     float4 currentVelocity = oldVelocity[threadInGrid];
-
     currentVelocity.xyz += acceleration * params.timestep;
     currentVelocity.xyz *= params.damping;
+
+    float4 currentPosition = oldPosition[threadInGrid];
     currentPosition.xyz += currentVelocity.xyz * params.timestep;
 
     newPosition[threadInGrid] = currentPosition;

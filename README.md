@@ -11,3 +11,4 @@ for his brilliant [help](https://stackoverflow.com/questions/61742070/macos-meta
 I think it's more-or-less self-explanatory, or maybe I'm just too busy to write a nice, useful
 description of it, or maybe just too lazy. Anyway, build and run, it's fun to watch.
 
+<img src="https://github.com/SaganRitual/Foil/blob/master/SimulationImage.png">

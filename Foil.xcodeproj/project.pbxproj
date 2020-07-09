@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D42485E124B6D76700E7EDEE /* SimulationImage.png in Resources */ = {isa = PBXBuildFile; fileRef = D42485E024B6D76700E7EDEE /* SimulationImage.png */; };
 		D42B958B24648E2900F4B5B0 /* FoilShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = D42B958A24648E2900F4B5B0 /* FoilShaders.metal */; };
 		D4AC68B8245CF43F00917569 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AC68B7245CF43F00917569 /* AppDelegate.swift */; };
 		D4AC68BA245CF43F00917569 /* FoilViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AC68B9245CF43F00917569 /* FoilViewController.swift */; };
@@ -20,6 +21,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D42485DE24B6D09100E7EDEE /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.markdown; };
+		D42485E024B6D76700E7EDEE /* SimulationImage.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = SimulationImage.png; sourceTree = "<group>"; };
 		D42B958A24648E2900F4B5B0 /* FoilShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = FoilShaders.metal; sourceTree = "<group>"; };
 		D475693C2469259D000F87AE /* Foil-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Foil-Bridging-Header.h"; sourceTree = "<group>"; };
 		D475693F24692638000F87AE /* FoilShaderTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FoilShaderTypes.h; sourceTree = "<group>"; };
@@ -53,6 +56,8 @@
 		D4AC68AB245CF43F00917569 = {
 			isa = PBXGroup;
 			children = (
+				D42485DE24B6D09100E7EDEE /* README.md */,
+				D42485E024B6D76700E7EDEE /* SimulationImage.png */,
 				D4AC68B6245CF43F00917569 /* Foil */,
 				D4AC68C7245CF56900917569 /* Renderer */,
 				D4F680AA245FACA4000B8EF2 /* Simulation */,
@@ -173,6 +178,7 @@
 			files = (
 				D4AC68BC245CF44000917569 /* Assets.xcassets in Resources */,
 				D4AC68BF245CF44000917569 /* Main.storyboard in Resources */,
+				D42485E124B6D76700E7EDEE /* SimulationImage.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
